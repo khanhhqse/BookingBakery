@@ -12,7 +12,7 @@ namespace BookingBakery
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +98,20 @@ namespace BookingBakery
 
             var app = builder.Build();
 
+            // Gieo dữ liệu vai trò mặc định (Seeding)
+            using (var scope = app.Services.CreateScope())
+            {
+                var services = scope.ServiceProvider;
+                try
+                {
+                    await BookingBakery.Infrastructure.Persistence.MongoDbSeeder.SeedRolesAsync(services);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Lỗi khi gieo dữ liệu vai trò: {ex.Message}");
+                }
+            }
+
             // ─── HTTP Pipeline ───────────────────────────────────────────
             if (app.Environment.IsDevelopment())
             {
@@ -114,7 +128,7 @@ namespace BookingBakery
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
-            app.Run();
+            await app.RunAsync();
         }
     }
 }

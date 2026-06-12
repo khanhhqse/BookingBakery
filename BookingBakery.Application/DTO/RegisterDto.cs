@@ -19,7 +19,5 @@ namespace BookingBakery.Application.DTO
 
         [StringLength(20)]
         public string? Phone { get; set; }
-
-        public int RoleId { get; set; } = 2; // Default: User role
     }
 }

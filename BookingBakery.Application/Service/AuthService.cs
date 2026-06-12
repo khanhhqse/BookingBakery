@@ -21,7 +21,7 @@ namespace BookingBakery.Application.Service
             _configuration = configuration;
         }
 
-        public async Task<string> RegisterAsync(RegisterDto dto)
+        public async Task<string> RegisterAsync(RegisterDto dto, int roleId)
         {
             // Kiểm tra email đã tồn tại chưa
             var existingUser = await _userRepository.FindOneAsync(u => u.Email == dto.Email);
@@ -40,7 +40,7 @@ namespace BookingBakery.Application.Service
             var user = new User
             {
                 UserId = newUserId,
-                RoleId = dto.RoleId,
+                RoleId = roleId,
                 Username = dto.Username,
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),

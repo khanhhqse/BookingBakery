@@ -4,7 +4,7 @@ namespace BookingBakery.Application.IService
 {
     public interface IAuthService
     {
-        Task<string> RegisterAsync(RegisterDto dto);
+        Task<string> RegisterAsync(RegisterDto dto, int roleId);
         Task<LoginResultDto?> LoginAsync(LoginDto dto);
     }
 }

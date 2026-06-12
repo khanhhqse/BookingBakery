@@ -17,7 +17,7 @@ namespace BookingBakery.Controllers
         }
 
         /// <summary>
-        /// Đăng ký tài khoản mới
+        /// Đăng ký tài khoản khách hàng mới (mặc định Role = 3)
         /// </summary>
         /// <param name="dto">Thông tin đăng ký</param>
         /// <returns>Thông báo thành công</returns>
@@ -31,7 +31,55 @@ namespace BookingBakery.Controllers
 
             try
             {
-                var message = await _authService.RegisterAsync(dto);
+                var message = await _authService.RegisterAsync(dto, 3);
+                return Ok(new { message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Đăng ký tài khoản nhân viên mới (mặc định Role = 2)
+        /// </summary>
+        /// <param name="dto">Thông tin đăng ký</param>
+        /// <returns>Thông báo thành công</returns>
+        [HttpPost("register-staff")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RegisterStaff([FromBody] RegisterDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var message = await _authService.RegisterAsync(dto, 2);
+                return Ok(new { message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Đăng ký tài khoản quản trị viên mới (mặc định Role = 1)
+        /// </summary>
+        /// <param name="dto">Thông tin đăng ký</param>
+        /// <returns>Thông báo thành công</returns>
+        [HttpPost("register-admin")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RegisterAdmin([FromBody] RegisterDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var message = await _authService.RegisterAsync(dto, 1);
                 return Ok(new { message });
             }
             catch (InvalidOperationException ex)
