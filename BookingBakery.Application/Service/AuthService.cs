@@ -13,11 +13,16 @@ namespace BookingBakery.Application.Service
     public class AuthService : IAuthService
     {
         private readonly IAuthRepository _userRepository;
+        private readonly IUserProfileRepository _profileRepository;
         private readonly IConfiguration _configuration;
 
-        public AuthService(IAuthRepository userRepository, IConfiguration configuration)
+        public AuthService(
+            IAuthRepository userRepository,
+            IUserProfileRepository profileRepository,
+            IConfiguration configuration)
         {
             _userRepository = userRepository;
+            _profileRepository = profileRepository;
             _configuration = configuration;
         }
 
@@ -51,6 +56,21 @@ namespace BookingBakery.Application.Service
             };
 
             await _userRepository.CreateAsync(user);
+
+            // ─── Tự tạo profile mặc định, full_name = username ──────
+            var allProfiles = await _profileRepository.GetAllAsync();
+            var newProfileId = allProfiles.Any() ? allProfiles.Max(p => p.ProfileId) + 1 : 1;
+
+            var profile = new UserProfile
+            {
+                ProfileId = newProfileId,
+                UserId = newUserId,
+                FullName = dto.Username,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _profileRepository.CreateAsync(profile);
+
             return "Đăng ký thành công.";
         }
 

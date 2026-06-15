@@ -18,12 +18,16 @@ namespace BookingBakery
 
             // ─── MongoDB ────────────────────────────────────────────────
             builder.Services.AddSingleton<MongoDbContext>();
-            
+
             // Đăng ký Repository cụ thể cho Authentication
             builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 
+            // Đăng ký Repository cụ thể cho UserProfile
+            builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+
             // ─── Application Services ────────────────────────────────────
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 
             // ─── JWT Authentication ──────────────────────────────────────
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
