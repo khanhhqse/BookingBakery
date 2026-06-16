@@ -79,5 +79,19 @@ namespace BookingBakery.Controllers
 
             return Ok(profile);
         }
+
+        // Admin: xem profile theo userId
+        [HttpGet("by-user/{userId:int}")]
+        [Authorize(Roles = "1")] // ⚠️ Đổi "1" thành đúng RoleId của Admin
+        [EndpointSummary("Admin lấy profile by user id")]
+        public async Task<IActionResult> GetProfileByUserId(int userId)
+        {
+            var profile = await _profileService.GetByUserIdAsync(userId);
+
+            if (profile == null)
+                return NotFound($"Không tìm thấy profile cho userId = {userId}.");
+
+            return Ok(profile);
+        }
     }
 }

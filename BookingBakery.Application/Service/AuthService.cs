@@ -33,8 +33,8 @@ namespace BookingBakery.Application.Service
             if (existingUser != null)
                 throw new InvalidOperationException("Email đã được sử dụng.");
 
-            // Kiểm tra username đã tồn tại chưa haha
-            // check 
+            // Kiểm tra username đã tồn tại chưa 
+            
             var existingUsername = await _userRepository.FindOneAsync(u => u.Username == dto.Username);
             if (existingUsername != null)
                 throw new InvalidOperationException("Username đã được sử dụng.");
