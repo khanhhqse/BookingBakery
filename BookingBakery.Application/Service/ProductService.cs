@@ -338,5 +338,31 @@ namespace BookingBakery.Application.Service
                 UpdatedAt = p.UpdatedAt
             });
         }
+
+        public async Task<IEnumerable<ProductDto>> GetProductsByCategoryIdAsync(int categoryId)
+        {
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == categoryId);
+            if (category == null)
+                throw new InvalidOperationException($"Danh mục với ID = {categoryId} không tồn tại.");
+
+            var products = await _productRepository.GetAllAsync();
+            var filteredProducts = products.Where(p => p.CategoryId == categoryId);
+
+            return filteredProducts.Select(p => new ProductDto
+            {
+                ProductId = p.ProductId,
+                CategoryId = p.CategoryId,
+                CategoryName = category.Name,
+                Name = p.Name,
+                Description = p.Description,
+                Price = p.Price,
+                CostPrice = p.CostPrice,
+                StockQuantity = p.StockQuantity,
+                ImageUrl = p.ImageUrl,
+                Status = p.Status,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt
+            });
+        }
     }
 }

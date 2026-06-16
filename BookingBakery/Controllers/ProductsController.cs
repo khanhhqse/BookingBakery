@@ -237,5 +237,27 @@ namespace BookingBakery.Controllers
             var products = await _productService.SearchProductsByNameAsync(name ?? string.Empty);
             return Ok(products);
         }
+
+        /// <summary>
+        /// Lấy danh sách sản phẩm theo danh mục (Khách vãng lai cũng xem được)
+        /// </summary>
+        [HttpGet("category/{categoryId:int}")]
+        [AllowAnonymous]
+        [EndpointSummary("Lấy danh sách sản phẩm theo danh mục")]
+        [EndpointDescription("Khách vãng lai cũng xem được")]
+        [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetByCategory(int categoryId)
+        {
+            try
+            {
+                var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+                return Ok(products);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

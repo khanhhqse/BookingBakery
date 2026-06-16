@@ -14,6 +14,7 @@ namespace BookingBakery.Application.IService
         Task<ProductDto?> UpdatePriceByNameAsync(string name, decimal price);
         Task<ProductDto?> UpdateDescriptionByNameAsync(string name, string? description);
         Task<IEnumerable<ProductDto>> SearchProductsByNameAsync(string name);
+        Task<IEnumerable<ProductDto>> GetProductsByCategoryIdAsync(int categoryId);
         Task<bool> DeleteProductAsync(int id);
     }
 }
