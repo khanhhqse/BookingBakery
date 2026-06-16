@@ -100,7 +100,7 @@ namespace BookingBakery.Controllers
         // Admin: lấy danh sách tất cả Staff
         [HttpGet("staff")]
         [Authorize(Roles = "1")] // Admin
-        [EndpointSummary("Admin lấy danh sách tất cả Staff")]
+        [EndpointSummary("Admin lấy profile tất cả Staff")]
         public async Task<IActionResult> GetAllStaff()
         {
             var staff = await _authService.GetUsersByRoleAsync(RoleIds.Staff);
