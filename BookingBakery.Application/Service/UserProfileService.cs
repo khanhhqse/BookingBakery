@@ -82,6 +82,13 @@ namespace BookingBakery.Application.Service
             return profile == null ? null : MapToDto(profile);
         }
 
+        public async Task<IEnumerable<UserProfileResponseDto>> GetByUserIdsAsync(IEnumerable<int> userIds)
+        {
+            var idSet = userIds.ToHashSet();
+            var allProfiles = await _profileRepository.GetAllAsync();
+            return allProfiles.Where(p => idSet.Contains(p.UserId)).Select(MapToDto);
+        }
+
         /// <summary>
         /// Giữ giá trị cũ nếu giá trị mới null hoặc rỗng/toàn khoảng trắng (coi như "không nhập gì").
         /// </summary>

@@ -2,6 +2,7 @@ using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
+using BookingBakery.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -82,6 +83,29 @@ namespace BookingBakery.Application.Service
                 return null;
 
             return GenerateLoginResult(user);
+        }
+
+        public async Task<IEnumerable<UserResponseDto>> GetUsersByRoleAsync(int roleId)
+        {
+            var allUsers = await _userRepository.GetAllAsync();
+            return allUsers
+                .Where(u => u.RoleId == roleId)
+                .Select(MapToUserResponseDto);
+        }
+
+        private static UserResponseDto MapToUserResponseDto(User user)
+        {
+            return new UserResponseDto
+            {
+                UserId = user.UserId,
+                RoleId = user.RoleId,
+                Username = user.Username,
+                Email = user.Email,
+                Phone = user.Phone,
+                Status = user.Status,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            };
         }
 
         private LoginResultDto GenerateLoginResult(User user)

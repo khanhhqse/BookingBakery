@@ -6,5 +6,6 @@ namespace BookingBakery.Application.IService
     {
         Task<string> RegisterAsync(RegisterDto dto, int roleId);
         Task<LoginResultDto?> LoginAsync(LoginDto dto);
+        Task<IEnumerable<UserResponseDto>> GetUsersByRoleAsync(int roleId);
     }
 }

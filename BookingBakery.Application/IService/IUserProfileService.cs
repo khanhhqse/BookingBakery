@@ -9,5 +9,6 @@ namespace BookingBakery.Application.IService
 
         Task<IEnumerable<UserProfileResponseDto>> GetAllAsync();
         Task<UserProfileResponseDto?> GetByProfileIdAsync(int profileId);
+        Task<IEnumerable<UserProfileResponseDto>> GetByUserIdsAsync(IEnumerable<int> userIds);
     }
 }

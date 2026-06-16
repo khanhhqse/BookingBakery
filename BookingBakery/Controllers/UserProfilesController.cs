@@ -1,5 +1,6 @@
 ﻿using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
+using BookingBakery.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
@@ -13,10 +14,12 @@ namespace BookingBakery.Controllers
     public class UserProfilesController : ControllerBase
     {
         private readonly IUserProfileService _profileService;
+        private readonly IAuthService _authService;
 
-        public UserProfilesController(IUserProfileService profileService)
+        public UserProfilesController(IUserProfileService profileService, IAuthService authService)
         {
             _profileService = profileService;
+            _authService = authService;
         }
 
         // Lấy thông tin profile của chính mình
@@ -92,6 +95,28 @@ namespace BookingBakery.Controllers
                 return NotFound($"Không tìm thấy profile cho userId = {userId}.");
 
             return Ok(profile);
+        }
+
+        // Admin: lấy danh sách tất cả Staff
+        [HttpGet("staff")]
+        [Authorize(Roles = "1")] // Admin
+        [EndpointSummary("Admin lấy danh sách tất cả Staff")]
+        public async Task<IActionResult> GetAllStaff()
+        {
+            var staff = await _authService.GetUsersByRoleAsync(RoleIds.Staff);
+            return Ok(staff);
+        }
+
+        // Admin: lấy profile của tất cả Customer
+        [HttpGet("customers")]
+        [Authorize(Roles = "1")] // Admin
+        [EndpointSummary("Admin lấy profile của tất cả Customer")]
+        public async Task<IActionResult> GetAllCustomerProfiles()
+        {
+            var customers = await _authService.GetUsersByRoleAsync(RoleIds.Customer);
+            var customerUserIds = customers.Select(u => u.UserId);
+            var profiles = await _profileService.GetByUserIdsAsync(customerUserIds);
+            return Ok(profiles);
         }
     }
 }
