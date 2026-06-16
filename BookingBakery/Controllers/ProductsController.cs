@@ -22,6 +22,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpGet]
         [AllowAnonymous]
+        [EndpointSummary("Xem toàn bộ sản phẩm trong kho")]
+        [EndpointDescription("Khách vãng lai cũng xem được")]
         [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll()
         {
@@ -34,6 +36,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpGet("{id:int}")]
         [AllowAnonymous]
+        [EndpointSummary("Xem sản phẩm theo ID")]
+        [EndpointDescription("Khách vãng lai cũng xem được")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
@@ -50,6 +54,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPost]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Thêm sản phẩm mới vào kho")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
@@ -73,6 +79,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("{id:int}/price")]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật giá sản phẩm")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -93,6 +101,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("{id:int}/description")]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật mô tả sản phẩm")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -113,6 +123,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("{id:int}/stock")]
         [Authorize(Roles = "1,2")]
+        [EndpointSummary("Cập nhật số lượng sản phẩm")]
+        [EndpointDescription("Admin và Staff")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -133,6 +145,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpDelete("{id:int}")]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Xóa sản phẩm khỏi kho")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(int id)
@@ -149,6 +163,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("by-name/{name}/price")]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật giá sản phẩm theo tên")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -169,6 +185,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("by-name/{name}/description")]
         [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật mô tả sản phẩm theo tên")]
+        [EndpointDescription("Chỉ Admin")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -189,6 +207,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpPut("by-name/{name}/stock")]
         [Authorize(Roles = "1,2")]
+        [EndpointSummary("Cập nhật số lượng sản phẩm theo tên")]
+        [EndpointDescription("Admin và Staff")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -209,6 +229,8 @@ namespace BookingBakery.Controllers
         /// </summary>
         [HttpGet("search")]
         [AllowAnonymous]
+        [EndpointSummary("Tìm kiếm sản phẩm theo tên")]
+        [EndpointDescription("Khách vãng lai cũng tìm được")]
         [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> SearchByName([FromQuery] string name)
         {

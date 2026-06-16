@@ -24,6 +24,8 @@ namespace BookingBakery.Controllers
         /// <returns>Danh sách các danh mục</returns>
         [HttpGet]
         [AllowAnonymous]
+        [EndpointSummary("Xem toàn bộ danh sách danh mục")]
+        [EndpointDescription("Mọi người đều có quyền xem kể cả khách chưa đăng nhập")]
         [ProducesResponseType(typeof(IEnumerable<CategoryDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll()
         {
@@ -35,6 +37,8 @@ namespace BookingBakery.Controllers
         /// Xem thông tin danh mục theo ID (Chỉ Admin và Staff)
         /// </summary>
         [HttpGet("{id:int}")]
+        [EndpointSummary("Xem thông tin danh mục theo ID")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetById(int id)
@@ -50,6 +54,8 @@ namespace BookingBakery.Controllers
         /// Thêm danh mục mới (Chỉ Admin và Staff)
         /// </summary>
         [HttpPost]
+        [EndpointSummary("Thêm danh mục mới")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] CreateCategoryDto dto)
@@ -72,6 +78,8 @@ namespace BookingBakery.Controllers
         /// Sửa thông tin danh mục (Chỉ Admin và Staff)
         /// </summary>
         [HttpPut("{id:int}")]
+        [EndpointSummary("Sửa thông tin danh mục")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -91,6 +99,8 @@ namespace BookingBakery.Controllers
         /// Xóa danh mục (Chỉ Admin và Staff)
         /// </summary>
         [HttpDelete("{id:int}")]
+        [EndpointSummary("Xóa danh mục")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Delete(int id)
@@ -106,6 +116,8 @@ namespace BookingBakery.Controllers
         /// Xóa danh mục theo tên (Chỉ Admin và Staff)
         /// </summary>
         [HttpDelete("by-name/{name}")]
+        [EndpointSummary("Xóa danh mục theo tên")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteByName(string name)
@@ -121,6 +133,8 @@ namespace BookingBakery.Controllers
         /// Sửa thông tin danh mục theo tên (Chỉ Admin và Staff)
         /// </summary>
         [HttpPut("by-name/{name}")]
+        [EndpointSummary("Sửa thông tin danh mục theo tên")]
+        [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
