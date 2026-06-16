@@ -19,11 +19,15 @@ namespace BookingBakery
             // ─── MongoDB ────────────────────────────────────────────────
             builder.Services.AddSingleton<MongoDbContext>();
             
-            // Đăng ký Repository cụ thể cho Authentication
+            // Đăng ký Repository cụ thể cho Authentication, Category và Product
             builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+            builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
             // ─── Application Services ────────────────────────────────────
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<ICategoryService, CategoryService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
 
             // ─── JWT Authentication ──────────────────────────────────────
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -122,12 +126,32 @@ namespace BookingBakery
                     options.RoutePrefix = "swagger";
                     options.DocumentTitle = "BookingBakery API";
                 });
+
+                // Tự động chuyển hướng trang chủ "/" sang "/swagger" trong môi trường Development
+                app.MapGet("/", context =>
+                {
+                    context.Response.Redirect("/swagger");
+                    return Task.CompletedTask;
+                });
             }
 
             app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+
+            // In đường dẫn Swagger ra console khi ứng dụng khởi động thành công
+            app.Lifetime.ApplicationStarted.Register(() =>
+            {
+                Console.WriteLine("\n==========================================================");
+                Console.WriteLine("API is running!");
+                foreach (var address in app.Urls)
+                {
+                    Console.WriteLine($"Access Swagger at: {address}/swagger");
+                }
+                Console.WriteLine("==========================================================\n");
+            });
+
             await app.RunAsync();
         }
     }
