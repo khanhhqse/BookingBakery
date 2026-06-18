@@ -34,14 +34,25 @@ namespace BookingBakery.Application.Service
             {
                 var product = await _productRepository.FindOneAsync(p => p.ProductId == item.ProductId);
 
-                // BR-C03: sản phẩm không còn tồn tại hoặc đã hết hàng -> tự xóa khỏi giỏ + thông báo
-                if (product == null || product.Status == "sold_out")
+                // Sản phẩm đã bị gỡ khỏi hệ thống -> tự xóa khỏi giỏ + thông báo
+                if (product == null)
                 {
                     await _cartItemRepository.DeleteAsync(
                         ci => ci.CartId == item.CartId && ci.ProductId == item.ProductId);
 
                     removedNotices.Add(
-                        $"Sản phẩm \"{product?.Name ?? $"#{item.ProductId}"}\" đã hết hàng và bị xóa khỏi giỏ hàng của bạn.");
+                        "Rất tiếc, một sản phẩm trong giỏ hàng của bạn hiện không còn được bán nên đã được tự động xóa khỏi giỏ hàng.");
+                    continue;
+                }
+
+                // BR-C03: sản phẩm đã hết hàng -> tự xóa khỏi giỏ + thông báo
+                if (product.Status == "sold_out")
+                {
+                    await _cartItemRepository.DeleteAsync(
+                        ci => ci.CartId == item.CartId && ci.ProductId == item.ProductId);
+
+                    removedNotices.Add(
+                        $"Rất tiếc, sản phẩm \"{product.Name}\" hiện đã hết hàng nên đã được tự động xóa khỏi giỏ hàng của bạn.");
                     continue;
                 }
 
@@ -50,7 +61,6 @@ namespace BookingBakery.Application.Service
                 // Tồn kho giảm xuống thấp hơn số đang có trong giỏ -> tự hạ về đúng số tồn kho + thông báo
                 if (quantity > product.StockQuantity)
                 {
-                    var oldQuantity = quantity;
                     quantity = product.StockQuantity;
 
                     item.Quantity = quantity;
@@ -58,7 +68,7 @@ namespace BookingBakery.Application.Service
                         ci => ci.CartId == item.CartId && ci.ProductId == item.ProductId, item);
 
                     adjustedNotices.Add(
-                        $"Sản phẩm \"{product.Name}\" chỉ còn {product.StockQuantity} trong kho, số lượng trong giỏ đã giảm từ {oldQuantity} xuống {quantity}.");
+                        $"Sản phẩm \"{product.Name}\" hiện không còn đủ số lượng như trong giỏ hàng của bạn, chúng tôi đã điều chỉnh giảm số lượng giúp bạn, mời bạn kiểm tra lại giỏ hàng nhé.");
                 }
 
                 itemDtos.Add(new CartItemDto
@@ -87,10 +97,12 @@ namespace BookingBakery.Application.Service
         {
             var product = await _productRepository.FindOneAsync(p => p.ProductId == dto.ProductId);
             if (product == null)
-                throw new InvalidOperationException($"Sản phẩm với ID = {dto.ProductId} không tồn tại.");
+                throw new InvalidOperationException(
+                    "Sản phẩm bạn chọn hiện không tồn tại hoặc đã bị gỡ khỏi cửa hàng, vui lòng kiểm tra lại nhé.");
 
             if (product.Status == "sold_out")
-                throw new InvalidOperationException($"Sản phẩm \"{product.Name}\" hiện đã hết hàng.");
+                throw new InvalidOperationException(
+                    $"Rất tiếc, sản phẩm \"{product.Name}\" hiện đã hết hàng, mời bạn chọn sản phẩm khác nhé.");
 
             var cart = await GetOrCreateCartAsync(userId);
 
@@ -102,13 +114,21 @@ namespace BookingBakery.Application.Service
 
             // BR-C02: số lượng tối đa mỗi sản phẩm trong giỏ là 50
             if (newQuantity > 50)
-                throw new InvalidOperationException(
-                    $"Số lượng sản phẩm \"{product.Name}\" trong giỏ không được vượt quá 50 (hiện tại {currentQuantity}, thêm {dto.Quantity}).");
+            {
+                var remaining = 50 - currentQuantity;
 
-            // Không cho thêm vượt quá số lượng tồn kho thực tế
+                if (remaining <= 0)
+                    throw new InvalidOperationException(
+                        $"Giỏ hàng của bạn đã có tối đa 50 sản phẩm \"{product.Name}\", không thể thêm nữa.");
+
+                throw new InvalidOperationException(
+                    $"Mỗi đơn chỉ được đặt tối đa 50 sản phẩm \"{product.Name}\". Giỏ hàng của bạn hiện có {currentQuantity}, bạn có thể thêm tối đa {remaining} sản phẩm nữa nhé.");
+            }
+
+            // Không cho thêm vượt quá tồn kho thực tế - không lộ số tồn kho ra response
             if (newQuantity > product.StockQuantity)
                 throw new InvalidOperationException(
-                    $"Sản phẩm \"{product.Name}\" chỉ còn {product.StockQuantity} trong kho (hiện tại trong giỏ: {currentQuantity}, không thể thêm {dto.Quantity}).");
+                    $"Rất tiếc, sản phẩm \"{product.Name}\" hiện không đủ số lượng trong kho để thêm vào giỏ hàng. Mời bạn giảm số lượng hoặc chọn sản phẩm khác nhé.");
 
             if (existingItem != null)
             {
@@ -133,15 +153,17 @@ namespace BookingBakery.Application.Service
         public async Task<CartDto> UpdateItemQuantityAsync(int userId, int productId, int quantity)
         {
             if (quantity < 1 || quantity > 50)
-                throw new InvalidOperationException("Số lượng phải từ 1 đến 50.");
+                throw new InvalidOperationException("Số lượng mỗi sản phẩm phải từ 1 đến 50 bạn nhé.");
 
             var product = await _productRepository.FindOneAsync(p => p.ProductId == productId);
             if (product == null)
-                throw new InvalidOperationException($"Sản phẩm với ID = {productId} không tồn tại.");
+                throw new InvalidOperationException(
+                    "Sản phẩm bạn muốn cập nhật hiện không tồn tại hoặc đã bị gỡ khỏi cửa hàng, vui lòng kiểm tra lại nhé.");
 
+            // Không lộ số tồn kho thực tế ra response
             if (quantity > product.StockQuantity)
                 throw new InvalidOperationException(
-                    $"Sản phẩm \"{product.Name}\" chỉ còn {product.StockQuantity} trong kho.");
+                    $"Rất tiếc, sản phẩm \"{product.Name}\" hiện không đủ số lượng trong kho để cập nhật theo số lượng bạn yêu cầu.");
 
             var cart = await GetOrCreateCartAsync(userId);
 
@@ -149,7 +171,8 @@ namespace BookingBakery.Application.Service
                 ci => ci.CartId == cart.CartId && ci.ProductId == productId);
 
             if (item == null)
-                throw new InvalidOperationException("Sản phẩm này không có trong giỏ hàng của bạn.");
+                throw new InvalidOperationException(
+                    "Sản phẩm này hiện không có trong giỏ hàng của bạn, có thể đã bị xóa trước đó.");
 
             item.Quantity = quantity;
             await _cartItemRepository.UpdateAsync(
@@ -167,7 +190,8 @@ namespace BookingBakery.Application.Service
                 ci => ci.CartId == cart.CartId && ci.ProductId == productId);
 
             if (item == null)
-                throw new InvalidOperationException("Sản phẩm này không có trong giỏ hàng của bạn.");
+                throw new InvalidOperationException(
+                    "Sản phẩm này hiện không có trong giỏ hàng của bạn, có thể đã bị xóa trước đó.");
 
             await _cartItemRepository.DeleteAsync(
                 ci => ci.CartId == cart.CartId && ci.ProductId == productId);
