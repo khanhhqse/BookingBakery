@@ -42,9 +42,6 @@ namespace BookingBakery.Application.DTO
 
         [StringLength(255)]
         public string? ImageUrl { get; set; }
-
-        [StringLength(20)]
-        public string Status { get; set; } = "stock";
     }
 
     public class UpdateProductStockDto

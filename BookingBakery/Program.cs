@@ -23,6 +23,8 @@ namespace BookingBakery
             builder.Services.AddScoped<IAuthRepository, AuthRepository>();
             builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
+            builder.Services.AddScoped<IProductIngredientRepository, ProductIngredientRepository>();
 
             // Đăng ký Repository cụ thể cho UserProfile
             builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
@@ -32,6 +34,8 @@ namespace BookingBakery
             builder.Services.AddScoped<IUserProfileService, UserProfileService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IIngredientService, IngredientService>();
+            builder.Services.AddScoped<IProductIngredientService, ProductIngredientService>();
 
 
             //
