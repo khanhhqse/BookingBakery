@@ -90,7 +90,7 @@ namespace BookingBakery.Application.Service
                 CostPrice = dto.CostPrice,
                 StockQuantity = dto.StockQuantity,
                 ImageUrl = dto.ImageUrl,
-                Status = dto.StockQuantity > 0 ? "stock" : "sold_out",
+                Status = "stock",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
