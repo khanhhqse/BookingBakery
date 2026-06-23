@@ -1,7 +1,6 @@
 using BookingBakery.Application.IService;
 using BookingBakery.Application.Service;
 using BookingBakery.Domain.IDomain;
-using BookingBakery.Domain.Models;
 using BookingBakery.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -19,25 +18,22 @@ namespace BookingBakery
             // ─── MongoDB ────────────────────────────────────────────────
             builder.Services.AddSingleton<MongoDbContext>();
 
-            // Đăng ký Repository cụ thể cho Authentication, Category và Product
+            // ─── Repositories ────────────────────────────────────────────
             builder.Services.AddScoped<IAuthRepository, AuthRepository>();
             builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
-
-            // Đăng ký Repository cụ thể cho UserProfile
             builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+            builder.Services.AddScoped<ICartRepository, CartRepository>();
+            builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
+            builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
             // ─── Application Services ────────────────────────────────────
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IUserProfileService, UserProfileService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IProductService, ProductService>();
-
-
-            //
-            builder.Services.AddScoped<ICartRepository, CartRepository>();
-            builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
             builder.Services.AddScoped<ICartService, CartService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
 
             // ─── JWT Authentication ──────────────────────────────────────
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -66,7 +62,7 @@ namespace BookingBakery
             builder.Services.AddAuthorization();
             builder.Services.AddControllers();
 
-            // ─── Swagger với JWT Bearer ──────────────────────────────────
+            // ─── Swagger ─────────────────────────────────────────────────
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
             {
@@ -82,7 +78,12 @@ namespace BookingBakery
                     }
                 });
 
-                // Định nghĩa JWT Bearer Security
+                // Hiển thị summary và remarks từ XML comments
+                var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                if (File.Exists(xmlPath))
+                    options.IncludeXmlComments(xmlPath);
+
                 options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Name = "Authorization",
@@ -93,7 +94,6 @@ namespace BookingBakery
                     Description = "Nhập JWT token theo định dạng: Bearer {token}\n\nVí dụ: Bearer eyJhbGci..."
                 });
 
-                // Yêu cầu JWT cho tất cả endpoint có [Authorize]
                 options.AddSecurityRequirement(new OpenApiSecurityRequirement
                 {
                     {
@@ -102,7 +102,7 @@ namespace BookingBakery
                             Reference = new OpenApiReference
                             {
                                 Type = ReferenceType.SecurityScheme,
-                                Id = "Bearer"
+                                Id   = "Bearer"
                             }
                         },
                         Array.Empty<string>()
@@ -112,7 +112,7 @@ namespace BookingBakery
 
             var app = builder.Build();
 
-            // Gieo dữ liệu vai trò mặc định (Seeding)
+            // Seeding
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
@@ -137,7 +137,6 @@ namespace BookingBakery
                     options.DocumentTitle = "BookingBakery API";
                 });
 
-                // Tự động chuyển hướng trang chủ "/" sang "/swagger" trong môi trường Development
                 app.MapGet("/", context =>
                 {
                     context.Response.Redirect("/swagger");
@@ -150,15 +149,12 @@ namespace BookingBakery
             app.UseAuthorization();
             app.MapControllers();
 
-            // In đường dẫn Swagger ra console khi ứng dụng khởi động thành công
             app.Lifetime.ApplicationStarted.Register(() =>
             {
                 Console.WriteLine("\n==========================================================");
                 Console.WriteLine("API is running!");
                 foreach (var address in app.Urls)
-                {
                     Console.WriteLine($"Access Swagger at: {address}/swagger");
-                }
                 Console.WriteLine("==========================================================\n");
             });
 
