@@ -48,11 +48,27 @@ namespace BookingBakery.Domain.IDomain
                 .ToListAsync();
         }
 
-        public async Task<List<Order>> GetAllAsync(int page, int pageSize)
+        public async Task<List<Order>> GetAllAsync(
+            int page, int pageSize, string? status, DateTime? fromDate, DateTime? toDate)
         {
-            // BR-O04: FIFO — cũ nhất lên trước để Staff xử lý đúng thứ tự
+            // Build filter động
+            var builder = Builders<Order>.Filter;
+            var filter = builder.Empty;
+
+            // Lọc theo status nếu có
+            if (!string.IsNullOrWhiteSpace(status))
+                filter &= builder.Eq(o => o.Status, status);
+
+            // Lọc theo khoảng ngày (UTC — đã convert từ Service)
+            if (fromDate.HasValue)
+                filter &= builder.Gte(o => o.CreatedAt, fromDate.Value);
+
+            if (toDate.HasValue)
+                filter &= builder.Lte(o => o.CreatedAt, toDate.Value);
+
+            // BR-O04: FIFO — cũ nhất lên trước
             return await _orders
-                .Find(_ => true)
+                .Find(filter)
                 .SortBy(o => o.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Limit(pageSize)

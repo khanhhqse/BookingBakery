@@ -16,9 +16,9 @@ namespace BookingBakery.Application.IService
         Task<(bool Success, string Message, OrderResponse? Order)> GetOrderDetailAsync(
             int orderId, int requestUserId, string userRole);
 
-        /// <summary>Admin / Staff xem toàn bộ đơn hàng (FIFO — BR-O04).</summary>
+        /// <summary>Admin / Staff xem toàn bộ đơn hàng với filter (FIFO — BR-O04).</summary>
         Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetAllOrdersAsync(
-            int page, int pageSize);
+            GetAllOrdersRequest request);
 
         /// <summary>Staff / Admin chuyển trạng thái đơn (BR-L01 — một chiều).</summary>
         Task<(bool Success, string Message)> UpdateOrderStatusAsync(

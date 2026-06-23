@@ -44,6 +44,32 @@ namespace BookingBakery.Application.DTO
         public string? Note { get; set; }
     }
 
+    /// <summary>Query filter cho Admin/Staff xem danh sách đơn hàng.</summary>
+    public class GetAllOrdersRequest
+    {
+        /// <summary>Trang hiện tại (mặc định 1).</summary>
+        public int Page { get; set; } = 1;
+
+        /// <summary>Số đơn mỗi trang (mặc định 20, tối đa 100).</summary>
+        public int PageSize { get; set; } = 20;
+
+        /// <summary>
+        /// Lọc theo trạng thái đơn hàng.
+        /// Giá trị hợp lệ: "Chờ xác nhận" | "Đang làm" | "Đang giao" | "Hoàn thành" | "Đã hủy"
+        /// Để trống = lấy tất cả trạng thái.
+        /// </summary>
+        public string? Status { get; set; }
+
+        /// <summary>Lọc đơn hàng trong ngày hôm nay (giờ VN). Ưu tiên hơn FromDate/ToDate.</summary>
+        public bool? Today { get; set; }
+
+        /// <summary>Lọc từ ngày (định dạng: yyyy-MM-dd). Ví dụ: 2026-06-01</summary>
+        public DateTime? FromDate { get; set; }
+
+        /// <summary>Lọc đến ngày (định dạng: yyyy-MM-dd). Ví dụ: 2026-06-30</summary>
+        public DateTime? ToDate { get; set; }
+    }
+
     // ─────────────────────────────────────────────────────────────
     // RESPONSE
     // ─────────────────────────────────────────────────────────────

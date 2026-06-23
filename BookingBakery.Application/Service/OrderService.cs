@@ -149,17 +149,43 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 4. XEM TẤT CẢ ĐƠN (Admin / Staff — FIFO)
+        // 4. XEM TẤT CẢ ĐƠN (Admin / Staff — FIFO + filter)
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetAllOrdersAsync(
-            int page, int pageSize)
+            GetAllOrdersRequest request)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1 || pageSize > 100) pageSize = 20;
+            // Normalize pagination
+            if (request.Page < 1) request.Page = 1;
+            if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 20;
 
-            var orders = await _orderRepo.GetAllAsync(page, pageSize);
+            DateTime? fromDate = null;
+            DateTime? toDate = null;
+
+            // Today filter — ưu tiên hơn FromDate/ToDate
+            if (request.Today == true)
+            {
+                // Giờ VN (UTC+7) → convert sang UTC để query MongoDB
+                var todayVn = DateTime.UtcNow.AddHours(7).Date;
+                fromDate = todayVn.AddHours(-7);             // 00:00 VN → UTC
+                toDate = todayVn.AddHours(17).AddSeconds(-1); // 23:59:59 VN → UTC
+            }
+            else
+            {
+                // FromDate/ToDate: người dùng truyền ngày theo giờ VN
+                if (request.FromDate.HasValue)
+                    fromDate = DateTime.SpecifyKind(request.FromDate.Value.Date, DateTimeKind.Utc)
+                                       .AddHours(-7); // 00:00 VN → UTC
+
+                if (request.ToDate.HasValue)
+                    toDate = DateTime.SpecifyKind(request.ToDate.Value.Date, DateTimeKind.Utc)
+                                     .AddHours(17).AddSeconds(-1); // 23:59:59 VN → UTC
+            }
+
+            var orders = await _orderRepo.GetAllAsync(
+                request.Page, request.PageSize, request.Status, fromDate, toDate);
             var responses = orders.Select(MapToResponse).ToList();
-            return (true, $"Lấy danh sách đơn hàng thành công (trang {page}).", responses);
+
+            return (true, $"Lấy danh sách đơn hàng thành công (trang {request.Page}).", responses);
         }
 
         // ──────────────────────────────────────────────────────────────

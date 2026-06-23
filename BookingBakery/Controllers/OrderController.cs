@@ -59,12 +59,13 @@ namespace BookingBakery.Controllers
         [HttpGet]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Xem toàn bộ đơn hàng (FIFO — Admin/Staff)")]
+        [EndpointDescription("Hỗ trợ lọc theo trạng thái, hôm nay, theo ngày hoặc khoảng ngày. " +
+            "Status hợp lệ: 'Chờ xác nhận' | 'Đang làm' | 'Đang giao' | 'Hoàn thành' | 'Đã hủy'. " +
+            "Today=true sẽ ưu tiên hơn FromDate/ToDate. Ngày theo định dạng yyyy-MM-dd (giờ VN).")]
         [ProducesResponseType(typeof(List<OrderResponse>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAllOrders(
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAllOrders([FromQuery] GetAllOrdersRequest request)
         {
-            var (success, message, orders) = await _orderService.GetAllOrdersAsync(page, pageSize);
+            var (success, message, orders) = await _orderService.GetAllOrdersAsync(request);
             return Ok(new { message, data = orders });
         }
 
@@ -91,7 +92,7 @@ namespace BookingBakery.Controllers
         [HttpPut("{orderId:int}/status")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật trạng thái đơn hàng (Staff/Admin)")]
-        [EndpointDescription("Giá trị newStatus: 1 = Đang làm (tự động trừ stock), 2 = Đang giao, 3 = Hoàn thành. Có thể bỏ qua bước giữa (VD: Chờ xác nhận → Đang giao) nhưng không được kéo ngược trạng thái (BR-L01).")]
+        [EndpointDescription("Giá trị newStatus: 1 = Đang làm, 2 = Đang giao, 3 = Hoàn thành. Có thể bỏ qua bước giữa (VD: Chờ xác nhận → Đang giao) nhưng không được kéo ngược trạng thái (BR-L01).")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdateOrderStatus(
