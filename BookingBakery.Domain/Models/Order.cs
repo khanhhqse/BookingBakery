@@ -27,6 +27,7 @@ namespace BookingBakery.Domain.Models
         public decimal TotalPrice { get; set; }
     }
 
+    [BsonIgnoreExtraElements]
     public class Order
     {
         [BsonId]
@@ -62,6 +63,10 @@ namespace BookingBakery.Domain.Models
         /// <summary>Lý do hủy — bắt buộc khi hủy đơn (BR-L06).</summary>
         [BsonElement("cancel_reason")]
         public string? CancelReason { get; set; }
+
+        /// <summary>Thời điểm chuyển sang "Đang giao" — dùng để tính auto-complete sau 48h.</summary>
+        [BsonElement("delivered_at")]
+        public DateTime? DeliveredAt { get; set; }
 
         [BsonElement("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

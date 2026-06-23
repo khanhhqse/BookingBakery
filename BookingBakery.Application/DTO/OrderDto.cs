@@ -75,6 +75,7 @@ namespace BookingBakery.Application.DTO
         public string ShippingAddress { get; set; } = string.Empty;
         public string? Note { get; set; }
         public string? CancelReason { get; set; }
+        public DateTime? DeliveredAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<OrderStatusHistoryResponse> StatusHistory { get; set; } = new();

@@ -2,8 +2,6 @@
 using BookingBakery.Application.IService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Collections;
-using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -93,7 +91,7 @@ namespace BookingBakery.Controllers
         [HttpPut("{orderId:int}/status")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật trạng thái đơn hàng (Staff/Admin)")]
-        [EndpointDescription("Chuyển trạng thái một chiều (BR-L01): Chờ xác nhận → Đang làm → Đang giao → Hoàn thành. Giá trị newStatus: 1 = Đang làm(tự động trừ stock), 2 = Đang giao, 3 = Hoàn thành.")]
+        [EndpointDescription("Giá trị newStatus: 1 = Đang làm (tự động trừ stock), 2 = Đang giao, 3 = Hoàn thành. Có thể bỏ qua bước giữa (VD: Chờ xác nhận → Đang giao) nhưng không được kéo ngược trạng thái (BR-L01).")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdateOrderStatus(
@@ -133,6 +131,25 @@ namespace BookingBakery.Controllers
                 return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
 
             var (success, message) = await _orderService.CancelOrderAsync(orderId, request, userId.Value, userRole);
+
+            return success
+                ? Ok(new { message })
+                : BadRequest(new { message });
+        }
+
+        [HttpPut("{orderId:int}/confirm-received")]
+        [Authorize(Roles = "3")]
+        [EndpointSummary("Xác nhận đã nhận hàng (Customer)")]
+        [EndpointDescription("Customer xác nhận đã nhận hàng khi đơn đang ở trạng thái 'Đang giao'. Đơn sẽ chuyển sang 'Hoàn thành'. Nếu sau 48h giao mà không xác nhận, hệ thống sẽ tự động hoàn thành (BR-L03).")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ConfirmReceived([FromRoute] int orderId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+
+            var (success, message) = await _orderService.CustomerConfirmReceivedAsync(orderId, userId.Value);
 
             return success
                 ? Ok(new { message })

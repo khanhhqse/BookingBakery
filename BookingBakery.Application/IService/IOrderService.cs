@@ -31,5 +31,12 @@ namespace BookingBakery.Application.IService
         /// </summary>
         Task<(bool Success, string Message)> CancelOrderAsync(
             int orderId, CancelOrderRequest request, int actorUserId, string actorRole);
+
+        /// <summary>
+        /// Customer xác nhận đã nhận hàng (BR-L03).
+        /// Chỉ được gọi khi đơn đang ở trạng thái "Đang giao".
+        /// </summary>
+        Task<(bool Success, string Message)> CustomerConfirmReceivedAsync(
+            int orderId, int userId);
     }
 }
