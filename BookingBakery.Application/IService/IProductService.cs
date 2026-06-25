@@ -16,5 +16,7 @@ namespace BookingBakery.Application.IService
         Task<IEnumerable<ProductDto>> SearchProductsByNameAsync(string name);
         Task<IEnumerable<ProductDto>> GetProductsByCategoryIdAsync(int categoryId);
         Task<bool> DeleteProductAsync(int id);
+        Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName);
+        Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName);
     }
 }
