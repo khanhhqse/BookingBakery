@@ -23,7 +23,8 @@ namespace BookingBakery.Controllers
 
         [HttpPost]
         [Authorize(Roles = "3")]
-        [EndpointSummary("Đặt hàng từ giỏ hàng hiện tại")]
+        [EndpointSummary("Khách hàng đặt hàng từ giỏ hàng hiện tại")]
+        [EndpointDescription("Payment method: COD = 1, BankTransfer = 2")]
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)
@@ -44,7 +45,7 @@ namespace BookingBakery.Controllers
 
         [HttpGet("me")]
         [Authorize(Roles = "3")]
-        [EndpointSummary("Xem danh sách đơn hàng của bản thân")]
+        [EndpointSummary("Khách hàng xem danh sách đơn hàng của bản thân")]
         [ProducesResponseType(typeof(List<OrderResponse>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMyOrders()
         {
@@ -70,8 +71,8 @@ namespace BookingBakery.Controllers
         }
 
         [HttpGet("{orderId:int}")]
-        [Authorize(Roles = "1,2,3")]
-        [EndpointSummary("Xem chi tiết một đơn hàng")]
+        [Authorize(Roles = "1,2")]
+        [EndpointSummary("Admin/ Staff xem chi tiết một đơn hàng")]
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderDetail([FromRoute] int orderId)
@@ -91,8 +92,8 @@ namespace BookingBakery.Controllers
 
         [HttpPut("{orderId:int}/status")]
         [Authorize(Roles = "1,2")]
-        [EndpointSummary("Cập nhật trạng thái đơn hàng (Staff/Admin)")]
-        [EndpointDescription("Giá trị newStatus: 1 = Đang làm, 2 = Đang giao, 3 = Hoàn thành. Có thể bỏ qua bước giữa (VD: Chờ xác nhận → Đang giao) nhưng không được kéo ngược trạng thái (BR-L01).")]
+        [EndpointSummary("Cập nhật trạng thái đơn hàng (Staff/Admin)/ Staff xác nhận đơn hàng")]
+        [EndpointDescription("Giá trị newStatus: 1 = Đang làm, 2 = Đang giao, 3 = Hoàn thành.")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdateOrderStatus(

@@ -60,6 +60,10 @@ namespace BookingBakery.Domain.Models
         [BsonElement("note")]
         public string? Note { get; set; }
 
+        /// <summary>Phương thức thanh toán: "COD" | "BankTransfer".</summary>
+        [BsonElement("payment_method")]
+        public string PaymentMethod { get; set; } = string.Empty;
+
         /// <summary>Lý do hủy — bắt buộc khi hủy đơn (BR-L06).</summary>
         [BsonElement("cancel_reason")]
         public string? CancelReason { get; set; }

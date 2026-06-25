@@ -2,6 +2,15 @@
 
 namespace BookingBakery.Application.DTO
 {
+    /// <summary>Phương thức thanh toán.</summary>
+    public enum PaymentMethodOption
+    {
+        /// <summary>Thanh toán khi nhận hàng (COD)</summary>
+        COD = 1,
+        /// <summary>Chuyển khoản ngân hàng</summary>
+        BankTransfer = 2
+    }
+
     /// <summary>Các trạng thái hợp lệ khi cập nhật đơn hàng (theo chiều thuận BR-L01).</summary>
     public enum OrderStatusOption
     {
@@ -25,6 +34,9 @@ namespace BookingBakery.Application.DTO
 
         [StringLength(500, ErrorMessage = "Ghi chú không được vượt quá 500 ký tự.")]
         public string? Note { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng chọn phương thức thanh toán.")]
+        public PaymentMethodOption PaymentMethod { get; set; }
     }
 
     public class CancelOrderRequest
@@ -101,6 +113,7 @@ namespace BookingBakery.Application.DTO
         public string ShippingAddress { get; set; } = string.Empty;
         public string? Note { get; set; }
         public string? CancelReason { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
         public DateTime? DeliveredAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

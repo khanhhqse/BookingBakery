@@ -55,7 +55,7 @@ namespace BookingBakery.Controllers
         [HttpPost]
         [Authorize(Roles = "1")]
         [EndpointSummary("Thêm sản phẩm mới vào kho")]
-        [EndpointDescription("Chỉ Admin")]
+        [EndpointDescription("Chỉ Admin. Field status phải điền là 'stock'.")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] CreateProductDto dto)

@@ -91,6 +91,14 @@ namespace BookingBakery.Application.Service
             var orderId = await _orderRepo.GetNextOrderIdAsync();
             var now = DateTime.UtcNow;
 
+            // Map enum -> string
+            var paymentMethod = request.PaymentMethod switch
+            {
+                PaymentMethodOption.COD => "COD",
+                PaymentMethodOption.BankTransfer => "Chuyển khoản",
+                _ => "COD"
+            };
+
             var order = new Order
             {
                 OrderId = orderId,
@@ -100,6 +108,7 @@ namespace BookingBakery.Application.Service
                 TotalPrice = totalPrice,
                 ShippingAddress = request.ShippingAddress,
                 Note = request.Note,
+                PaymentMethod = paymentMethod,
                 CreatedAt = now,
                 UpdatedAt = now,
                 StatusHistory = new List<OrderStatusHistory>
@@ -116,6 +125,9 @@ namespace BookingBakery.Application.Service
 
             await _orderRepo.CreateAsync(order);
 
+            // Xóa toàn bộ items trong cart sau khi đặt hàng thành công
+            await _cartItemRepo.DeleteManyAsync(ci => ci.CartId == cart.CartId);
+
             return (true,
                 "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.",
                 MapToResponse(order));
@@ -124,11 +136,11 @@ namespace BookingBakery.Application.Service
         // ──────────────────────────────────────────────────────────────
         // 2. XEM ĐƠN HÀNG CỦA MÌNH (Customer)
         // ──────────────────────────────────────────────────────────────
-        public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetMyOrdersAsync(
+        public async Task<(bool Success, string Message, List<OrderSummaryResponse>? Orders)> GetMyOrdersAsync(
             int userId)
         {
             var orders = await _orderRepo.GetByUserIdAsync(userId);
-            var responses = orders.Select(MapToResponse).ToList();
+            var responses = orders.Select(MapToSummary).ToList();
             return (true, "Lấy danh sách đơn hàng thành công.", responses);
         }
 
@@ -183,7 +195,7 @@ namespace BookingBakery.Application.Service
 
             var orders = await _orderRepo.GetAllAsync(
                 request.Page, request.PageSize, request.Status, fromDate, toDate);
-            var responses = orders.Select(MapToResponse).ToList();
+            var responses = orders.Select(MapToSummary).ToList();
 
             return (true, $"Lấy danh sách đơn hàng thành công (trang {request.Page}).", responses);
         }
@@ -413,6 +425,34 @@ namespace BookingBakery.Application.Service
             });
         }
 
+        private static OrderSummaryResponse MapToSummary(Order o)
+        {
+            var last = o.StatusHistory.LastOrDefault();
+            return new()
+            {
+                OrderId = o.OrderId,
+                UserId = o.UserId,
+                TotalItems = o.Items.Count,
+                TotalQuantity = o.Items.Sum(i => i.Quantity),
+                Status = o.Status,
+                TotalPrice = o.TotalPrice,
+                ShippingAddress = o.ShippingAddress,
+                Note = o.Note,
+                CancelReason = o.CancelReason,
+                PaymentMethod = o.PaymentMethod,
+                DeliveredAt = o.DeliveredAt,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+                LastStatusChange = last == null ? null : new OrderStatusHistoryResponse
+                {
+                    Status = last.Status,
+                    ChangedAt = last.ChangedAt,
+                    ChangedByUserId = last.ChangedByUserId,
+                    Note = last.Note
+                }
+            };
+        }
+
         private static OrderResponse MapToResponse(Order o) => new()
         {
             OrderId = o.OrderId,
@@ -430,6 +470,7 @@ namespace BookingBakery.Application.Service
             ShippingAddress = o.ShippingAddress,
             Note = o.Note,
             CancelReason = o.CancelReason,
+            PaymentMethod = o.PaymentMethod,
             DeliveredAt = o.DeliveredAt,
             CreatedAt = o.CreatedAt,
             UpdatedAt = o.UpdatedAt,
