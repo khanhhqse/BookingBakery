@@ -91,7 +91,6 @@ namespace BookingBakery.Application.Service
             var orderId = await _orderRepo.GetNextOrderIdAsync();
             var now = DateTime.UtcNow;
 
-            // Map enum -> string
             var paymentMethod = request.PaymentMethod switch
             {
                 PaymentMethodOption.COD => "COD",
@@ -125,7 +124,7 @@ namespace BookingBakery.Application.Service
 
             await _orderRepo.CreateAsync(order);
 
-            // Xóa toàn bộ items trong cart sau khi đặt hàng thành công
+            // Xóa cart items sau khi đặt hàng thành công
             await _cartItemRepo.DeleteManyAsync(ci => ci.CartId == cart.CartId);
 
             return (true,
@@ -136,11 +135,11 @@ namespace BookingBakery.Application.Service
         // ──────────────────────────────────────────────────────────────
         // 2. XEM ĐƠN HÀNG CỦA MÌNH (Customer)
         // ──────────────────────────────────────────────────────────────
-        public async Task<(bool Success, string Message, List<OrderSummaryResponse>? Orders)> GetMyOrdersAsync(
+        public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetMyOrdersAsync(
             int userId)
         {
             var orders = await _orderRepo.GetByUserIdAsync(userId);
-            var responses = orders.Select(MapToSummary).ToList();
+            var responses = orders.Select(MapToResponse).ToList();
             return (true, "Lấy danh sách đơn hàng thành công.", responses);
         }
 
@@ -166,44 +165,38 @@ namespace BookingBakery.Application.Service
         public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetAllOrdersAsync(
             GetAllOrdersRequest request)
         {
-            // Normalize pagination
             if (request.Page < 1) request.Page = 1;
             if (request.PageSize < 1 || request.PageSize > 100) request.PageSize = 20;
 
             DateTime? fromDate = null;
             DateTime? toDate = null;
 
-            // Today filter — ưu tiên hơn FromDate/ToDate
             if (request.Today == true)
             {
-                // Giờ VN (UTC+7) → convert sang UTC để query MongoDB
                 var todayVn = DateTime.UtcNow.AddHours(7).Date;
-                fromDate = todayVn.AddHours(-7);             // 00:00 VN → UTC
-                toDate = todayVn.AddHours(17).AddSeconds(-1); // 23:59:59 VN → UTC
+                fromDate = todayVn.AddHours(-7);
+                toDate = todayVn.AddHours(17).AddSeconds(-1);
             }
             else
             {
-                // FromDate/ToDate: người dùng truyền ngày theo giờ VN
                 if (request.FromDate.HasValue)
                     fromDate = DateTime.SpecifyKind(request.FromDate.Value.Date, DateTimeKind.Utc)
-                                       .AddHours(-7); // 00:00 VN → UTC
+                                       .AddHours(-7);
 
                 if (request.ToDate.HasValue)
                     toDate = DateTime.SpecifyKind(request.ToDate.Value.Date, DateTimeKind.Utc)
-                                     .AddHours(17).AddSeconds(-1); // 23:59:59 VN → UTC
+                                     .AddHours(17).AddSeconds(-1);
             }
 
             var orders = await _orderRepo.GetAllAsync(
                 request.Page, request.PageSize, request.Status, fromDate, toDate);
-            var responses = orders.Select(MapToSummary).ToList();
+            var responses = orders.Select(MapToResponse).ToList();
 
             return (true, $"Lấy danh sách đơn hàng thành công (trang {request.Page}).", responses);
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 5. CẬP NHẬT TRẠNG THÁI — Staff / Admin
-        //    Bỏ validate cứng từng bước — chỉ cần đi đúng chiều thuận
-        //    Chờ xác nhận → Đang làm / Đang giao / Hoàn thành (có thể bỏ qua bước)
+        // 5. CẬP NHẬT TRẠNG THÁI — Staff / Admin (BR-L01, cho bỏ qua bước)
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> UpdateOrderStatusAsync(
             int orderId, UpdateOrderStatusRequest request, int actorUserId)
@@ -218,7 +211,6 @@ namespace BookingBakery.Application.Service
             if (order.Status == OrderStatus.HoanThanh)
                 return (false, $"Đơn hàng #{orderId} đã hoàn thành, không thể cập nhật trạng thái.");
 
-            // Map enum → string
             var requestedStatus = request.NewStatus switch
             {
                 OrderStatusOption.DangLam => OrderStatus.DangLam,
@@ -230,7 +222,6 @@ namespace BookingBakery.Application.Service
             if (string.IsNullOrEmpty(requestedStatus))
                 return (false, "Trạng thái không hợp lệ.");
 
-            // Thứ tự ưu tiên các trạng thái (chỉ được đi về phía trước)
             var statusOrder = new Dictionary<string, int>
             {
                 [OrderStatus.ChoXacNhan] = 1,
@@ -244,14 +235,12 @@ namespace BookingBakery.Application.Service
                 !statusOrder.TryGetValue(requestedStatus, out var requestedLevel))
                 return (false, "Trạng thái không hợp lệ.");
 
-            // Chặn kéo ngược trạng thái (BR-L01)
             if (requestedLevel <= currentLevel)
                 return (false,
                     $"Không thể chuyển đơn hàng từ \"{order.Status}\" về \"{requestedStatus}\". " +
                     "Trạng thái chỉ được chuyển theo chiều thuận.");
 
-            // BR-L02: Khi chuyển sang hoặc bỏ qua "Đang làm" → trừ stock
-            // (nếu bỏ qua Đang làm thì vẫn phải trừ stock)
+            // BR-L02: Trừ stock khi đi qua bước "Đang làm" dù bỏ qua hay không
             bool skipDangLam = currentLevel < statusOrder[OrderStatus.DangLam]
                             && requestedLevel > statusOrder[OrderStatus.DangLam];
             bool goToDangLam = requestedStatus == OrderStatus.DangLam;
@@ -263,7 +252,7 @@ namespace BookingBakery.Application.Service
                     return (false, deductResult.Message);
             }
 
-            // Ghi nhận DeliveredAt khi chuyển sang Đang giao
+            // Ghi nhận thời điểm giao hàng để tính auto-complete 48h (BR-L03)
             if (requestedStatus == OrderStatus.DangGiao)
                 order.DeliveredAt = DateTime.UtcNow;
 
@@ -294,7 +283,6 @@ namespace BookingBakery.Application.Service
             bool isCustomer = actorRole == "3";
             bool isStaffOrAdmin = actorRole == "1" || actorRole == "2";
 
-            // BR-L07: Customer chỉ hủy được ở "Chờ xác nhận"
             if (isCustomer)
             {
                 if (order.UserId != actorUserId)
@@ -307,7 +295,6 @@ namespace BookingBakery.Application.Service
                         "Nếu cần hỗ trợ thêm, vui lòng liên hệ nhân viên của chúng tôi.");
             }
 
-            // Staff / Admin: hủy được ở "Chờ xác nhận" và "Đang làm"
             if (isStaffOrAdmin)
             {
                 var cancellableStatuses = new[] { OrderStatus.ChoXacNhan, OrderStatus.DangLam };
@@ -317,7 +304,6 @@ namespace BookingBakery.Application.Service
                         "không thể thực hiện hủy ở giai đoạn này.");
             }
 
-            // BR-L05: Hủy sau khi đang làm → ghi nhận hao hụt, KHÔNG hoàn kho
             var historyNote = order.Status == OrderStatus.DangLam
                 ? $"[Hao hụt ghi nhận] Hủy sau khi đang làm. Lý do: {request.CancelReason}"
                 : $"Lý do hủy: {request.CancelReason}";
@@ -366,18 +352,6 @@ namespace BookingBakery.Application.Service
         // PRIVATE HELPERS
         // ──────────────────────────────────────────────────────────────
 
-        private static Dictionary<string, int> GetStatusOrder() => new()
-        {
-            [OrderStatus.ChoXacNhan] = 1,
-            [OrderStatus.DangLam] = 2,
-            [OrderStatus.DangGiao] = 3,
-            [OrderStatus.HoanThanh] = 4,
-        };
-
-        /// <summary>
-        /// BR-L02: Trừ stock khi bắt đầu làm (hoặc bỏ qua bước Đang làm).
-        /// Pass 1: kiểm tra đủ toàn bộ. Pass 2: mới trừ.
-        /// </summary>
         private async Task<(bool Success, string Message)> DeductStockAsync(Order order)
         {
             var insufficientItems = new List<string>();
@@ -423,34 +397,6 @@ namespace BookingBakery.Application.Service
                 ChangedByUserId = changedByUserId,
                 Note = note
             });
-        }
-
-        private static OrderSummaryResponse MapToSummary(Order o)
-        {
-            var last = o.StatusHistory.LastOrDefault();
-            return new()
-            {
-                OrderId = o.OrderId,
-                UserId = o.UserId,
-                TotalItems = o.Items.Count,
-                TotalQuantity = o.Items.Sum(i => i.Quantity),
-                Status = o.Status,
-                TotalPrice = o.TotalPrice,
-                ShippingAddress = o.ShippingAddress,
-                Note = o.Note,
-                CancelReason = o.CancelReason,
-                PaymentMethod = o.PaymentMethod,
-                DeliveredAt = o.DeliveredAt,
-                CreatedAt = o.CreatedAt,
-                UpdatedAt = o.UpdatedAt,
-                LastStatusChange = last == null ? null : new OrderStatusHistoryResponse
-                {
-                    Status = last.Status,
-                    ChangedAt = last.ChangedAt,
-                    ChangedByUserId = last.ChangedByUserId,
-                    Note = last.Note
-                }
-            };
         }
 
         private static OrderResponse MapToResponse(Order o) => new()
