@@ -74,6 +74,18 @@ namespace BookingBakery
                 };
             });
 
+            // ─── CORS Configuration ──────────────────────────────────────
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowFrontend", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5173")
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials();
+                });
+            });
+
             builder.Services.AddAuthorization();
             builder.Services.AddControllers();
 
@@ -157,6 +169,7 @@ namespace BookingBakery
             }
 
             app.UseHttpsRedirection();
+            app.UseCors("AllowFrontend");
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
