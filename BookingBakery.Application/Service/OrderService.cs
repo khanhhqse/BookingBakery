@@ -11,17 +11,23 @@ namespace BookingBakery.Application.Service
         private readonly ICartRepository _cartRepo;
         private readonly ICartItemRepository _cartItemRepo;
         private readonly IProductRepository _productRepo;
+        private readonly IUserProfileRepository _profileRepo;
+        private readonly IAuthRepository _authRepo;
 
         public OrderService(
             IOrderRepository orderRepo,
             ICartRepository cartRepo,
             ICartItemRepository cartItemRepo,
-            IProductRepository productRepo)
+            IProductRepository productRepo,
+            IUserProfileRepository profileRepo,
+            IAuthRepository authRepo)
         {
             _orderRepo = orderRepo;
             _cartRepo = cartRepo;
             _cartItemRepo = cartItemRepo;
             _productRepo = productRepo;
+            _profileRepo = profileRepo;
+            _authRepo = authRepo;
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -32,15 +38,45 @@ namespace BookingBakery.Application.Service
         {
             var cart = await _cartRepo.FindOneAsync(c => c.UserId == userId);
             if (cart == null)
-                return (false,
-                    "Bạn chưa có giỏ hàng. Vui lòng thêm sản phẩm vào giỏ trước khi đặt hàng.", null);
+                return (false, "Bạn chưa có giỏ hàng. Vui lòng thêm sản phẩm vào giỏ trước khi đặt hàng.", null);
 
             var cartItemsEnum = await _cartItemRepo.FindManyAsync(ci => ci.CartId == cart.CartId);
             var cartItems = cartItemsEnum.ToList();
 
             if (cartItems.Count == 0)
-                return (false,
-                    "Giỏ hàng của bạn đang trống. Vui lòng thêm ít nhất một sản phẩm trước khi đặt hàng.", null);
+                return (false, "Giỏ hàng của bạn đang trống. Vui lòng thêm ít nhất một sản phẩm trước khi đặt hàng.", null);
+
+            // ── Auto-fill Phone và Address từ UserProfile nếu không truyền lên ──
+            var profile = await _profileRepo.FindOneAsync(p => p.UserId == userId);
+
+            var shippingAddress = request.ShippingAddress?.Trim();
+            var phone = request.Phone?.Trim();
+
+            // "" hoặc null → auto-fill từ UserProfile.Address
+            if (string.IsNullOrWhiteSpace(shippingAddress))
+            {
+                shippingAddress = profile?.Address?.Trim();
+                if (string.IsNullOrWhiteSpace(shippingAddress))
+                    return (false,
+                        "Bạn chưa có địa chỉ giao hàng trong hồ sơ. "
+                        + "Vui lòng cập nhật tại mục \"Hồ sơ của tôi\" hoặc nhập trực tiếp khi đặt hàng nhé.", null);
+            }
+
+            // Validate độ dài sau khi đã auto-fill
+            if (shippingAddress.Length < 10 || shippingAddress.Length > 255)
+                return (false, "Địa chỉ giao hàng phải từ 10 đến 255 ký tự.", null);
+
+            // Coi "" và "   " đều là "không truyền" → auto-fill từ User
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                var user = await _authRepo.GetByIdAsync(userId);
+                phone = user?.Phone?.Trim();
+
+                if (string.IsNullOrWhiteSpace(phone))
+                    return (false,
+                        "Bạn chưa có số điện thoại trong hồ sơ. " +
+                        "Vui lòng cập nhật số điện thoại tại mục hồ sơ cá nhân hoặc nhập trực tiếp khi đặt hàng nhé.", null);
+            }
 
             var orderItems = new List<OrderItem>();
             var unavailableProducts = new List<string>();
@@ -84,19 +120,20 @@ namespace BookingBakery.Application.Service
                     "Vui lòng điều chỉnh số lượng trong giỏ hàng rồi thử lại nhé.", null);
 
             if (orderItems.Count == 0)
-                return (false,
-                    "Không có sản phẩm hợp lệ nào để đặt hàng. Vui lòng kiểm tra lại giỏ hàng.", null);
+                return (false, "Không có sản phẩm hợp lệ nào để đặt hàng. Vui lòng kiểm tra lại giỏ hàng.", null);
 
             var totalPrice = orderItems.Sum(i => i.TotalPrice);
             var orderId = await _orderRepo.GetNextOrderIdAsync();
             var now = DateTime.UtcNow;
-
             var paymentMethod = request.PaymentMethod switch
             {
                 PaymentMethodOption.COD => "COD",
                 PaymentMethodOption.BankTransfer => "Chuyển khoản",
                 _ => "COD"
             };
+
+            // Lấy tên user để ghi vào statusHistory
+            var userName = profile?.FullName ?? $"User #{userId}";
 
             var order = new Order
             {
@@ -105,7 +142,8 @@ namespace BookingBakery.Application.Service
                 Items = orderItems,
                 Status = OrderStatus.ChoXacNhan,
                 TotalPrice = totalPrice,
-                ShippingAddress = request.ShippingAddress,
+                ShippingAddress = shippingAddress,
+                Phone = phone,
                 Note = request.Note,
                 PaymentMethod = paymentMethod,
                 CreatedAt = now,
@@ -114,37 +152,34 @@ namespace BookingBakery.Application.Service
                 {
                     new()
                     {
-                        Status          = OrderStatus.ChoXacNhan,
-                        ChangedAt       = now,
-                        ChangedByUserId = userId,
-                        Note            = "Khách hàng tạo đơn hàng"
+                        Status              = OrderStatus.ChoXacNhan,
+                        ChangedAt           = now,
+                        ChangedByUserId     = userId,
+                        ChangedByUserName   = userName,
+                        Note                = "Khách hàng tạo đơn hàng"
                     }
                 }
             };
 
             await _orderRepo.CreateAsync(order);
-
-            // Xóa cart items sau khi đặt hàng thành công
             await _cartItemRepo.DeleteManyAsync(ci => ci.CartId == cart.CartId);
 
-            return (true,
-                "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.",
-                MapToResponse(order));
+            return (true, "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.", MapToResponse(order));
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 2. XEM ĐƠN HÀNG CỦA MÌNH (Customer)
+        // 2. XEM ĐƠN CỦA MÌNH
         // ──────────────────────────────────────────────────────────────
-        public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetMyOrdersAsync(
+        public async Task<(bool Success, string Message, List<OrderSummaryResponse>? Orders)> GetMyOrdersAsync(
             int userId)
         {
             var orders = await _orderRepo.GetByUserIdAsync(userId);
-            var responses = orders.Select(MapToResponse).ToList();
+            var responses = orders.Select(MapToSummary).ToList();
             return (true, "Lấy danh sách đơn hàng thành công.", responses);
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 3. XEM CHI TIẾT ĐƠN HÀNG
+        // 3. XEM CHI TIẾT
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message, OrderResponse? Order)> GetOrderDetailAsync(
             int orderId, int requestUserId, string userRole)
@@ -160,9 +195,9 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 4. XEM TẤT CẢ ĐƠN (Admin / Staff — FIFO + filter)
+        // 4. XEM TẤT CẢ (Admin/Staff)
         // ──────────────────────────────────────────────────────────────
-        public async Task<(bool Success, string Message, List<OrderResponse>? Orders)> GetAllOrdersAsync(
+        public async Task<(bool Success, string Message, List<OrderSummaryResponse>? Orders)> GetAllOrdersAsync(
             GetAllOrdersRequest request)
         {
             if (request.Page < 1) request.Page = 1;
@@ -180,26 +215,21 @@ namespace BookingBakery.Application.Service
             else
             {
                 if (request.FromDate.HasValue)
-                    fromDate = DateTime.SpecifyKind(request.FromDate.Value.Date, DateTimeKind.Utc)
-                                       .AddHours(-7);
-
+                    fromDate = DateTime.SpecifyKind(request.FromDate.Value.Date, DateTimeKind.Utc).AddHours(-7);
                 if (request.ToDate.HasValue)
-                    toDate = DateTime.SpecifyKind(request.ToDate.Value.Date, DateTimeKind.Utc)
-                                     .AddHours(17).AddSeconds(-1);
+                    toDate = DateTime.SpecifyKind(request.ToDate.Value.Date, DateTimeKind.Utc).AddHours(17).AddSeconds(-1);
             }
 
-            var orders = await _orderRepo.GetAllAsync(
-                request.Page, request.PageSize, request.Status, fromDate, toDate);
-            var responses = orders.Select(MapToResponse).ToList();
-
+            var orders = await _orderRepo.GetAllAsync(request.Page, request.PageSize, request.Status, fromDate, toDate);
+            var responses = orders.Select(MapToSummary).ToList();
             return (true, $"Lấy danh sách đơn hàng thành công (trang {request.Page}).", responses);
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 5. CẬP NHẬT TRẠNG THÁI — Staff / Admin (BR-L01, cho bỏ qua bước)
+        // 5. CẬP NHẬT TRẠNG THÁI
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> UpdateOrderStatusAsync(
-            int orderId, UpdateOrderStatusRequest request, int actorUserId)
+            int orderId, UpdateOrderStatusRequest request, int actorUserId, string actorUserName)
         {
             var order = await _orderRepo.GetByOrderIdAsync(orderId);
             if (order == null)
@@ -240,7 +270,6 @@ namespace BookingBakery.Application.Service
                     $"Không thể chuyển đơn hàng từ \"{order.Status}\" về \"{requestedStatus}\". " +
                     "Trạng thái chỉ được chuyển theo chiều thuận.");
 
-            // BR-L02: Trừ stock khi đi qua bước "Đang làm" dù bỏ qua hay không
             bool skipDangLam = currentLevel < statusOrder[OrderStatus.DangLam]
                             && requestedLevel > statusOrder[OrderStatus.DangLam];
             bool goToDangLam = requestedStatus == OrderStatus.DangLam;
@@ -252,23 +281,21 @@ namespace BookingBakery.Application.Service
                     return (false, deductResult.Message);
             }
 
-            // Ghi nhận thời điểm giao hàng để tính auto-complete 48h (BR-L03)
             if (requestedStatus == OrderStatus.DangGiao)
                 order.DeliveredAt = DateTime.UtcNow;
 
-            AppendStatusHistory(order, requestedStatus, actorUserId, request.Note);
+            AppendStatusHistory(order, requestedStatus, actorUserId, actorUserName, request.Note);
             order.Status = requestedStatus;
             await _orderRepo.UpdateAsync(order);
 
-            return (true,
-                $"Đơn hàng #{orderId} đã được chuyển sang trạng thái \"{requestedStatus}\" thành công.");
+            return (true, $"Đơn hàng #{orderId} đã được chuyển sang trạng thái \"{requestedStatus}\" thành công.");
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 6. HỦY ĐƠN (BR-L04 / BR-L05 / BR-L06 / BR-L07)
+        // 6. HỦY ĐƠN
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> CancelOrderAsync(
-            int orderId, CancelOrderRequest request, int actorUserId, string actorRole)
+            int orderId, CancelOrderRequest request, int actorUserId, string actorUserName, string actorRole)
         {
             var order = await _orderRepo.GetByOrderIdAsync(orderId);
             if (order == null)
@@ -308,23 +335,22 @@ namespace BookingBakery.Application.Service
                 ? $"[Hao hụt ghi nhận] Hủy sau khi đang làm. Lý do: {request.CancelReason}"
                 : $"Lý do hủy: {request.CancelReason}";
 
-            AppendStatusHistory(order, OrderStatus.DaHuy, actorUserId, historyNote);
+            AppendStatusHistory(order, OrderStatus.DaHuy, actorUserId, actorUserName, historyNote);
             order.Status = OrderStatus.DaHuy;
             order.CancelReason = request.CancelReason;
             await _orderRepo.UpdateAsync(order);
 
             return (true,
                 isCustomer
-                    ? $"Đơn hàng #{orderId} đã được hủy thành công. " +
-                      "Nếu bạn có thắc mắc gì, đừng ngần ngại liên hệ với chúng tôi nhé!"
+                    ? $"Đơn hàng #{orderId} đã được hủy thành công. Nếu bạn có thắc mắc, đừng ngần ngại liên hệ chúng tôi nhé!"
                     : $"Đã hủy đơn hàng #{orderId}. Lý do đã được ghi nhận vào lịch sử đơn hàng.");
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 7. CUSTOMER XÁC NHẬN ĐÃ NHẬN HÀNG (BR-L03)
+        // 7. CUSTOMER XÁC NHẬN ĐÃ NHẬN HÀNG
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> CustomerConfirmReceivedAsync(
-            int orderId, int userId)
+            int orderId, int userId, string userName)
         {
             var order = await _orderRepo.GetByOrderIdAsync(orderId);
             if (order == null)
@@ -338,14 +364,45 @@ namespace BookingBakery.Application.Service
                     $"Đơn hàng #{orderId} đang ở trạng thái \"{order.Status}\". " +
                     "Bạn chỉ có thể xác nhận đã nhận hàng khi đơn đang được giao thôi nhé.");
 
-            AppendStatusHistory(order, OrderStatus.HoanThanh, userId,
-                "Khách hàng xác nhận đã nhận hàng");
+            AppendStatusHistory(order, OrderStatus.HoanThanh, userId, userName, "Khách hàng xác nhận đã nhận hàng");
             order.Status = OrderStatus.HoanThanh;
             await _orderRepo.UpdateAsync(order);
 
+            return (true, "Cảm ơn bạn đã xác nhận! Đơn hàng đã hoàn thành. Chúc bạn thưởng thức ngon miệng nhé!");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 8. CẬP NHẬT SĐT VÀ ĐỊA CHỈ (Customer — chỉ khi "Chờ xác nhận")
+        // ──────────────────────────────────────────────────────────────
+        public async Task<(bool Success, string Message, OrderResponse? Order)> UpdateOrderContactAsync(
+            int orderId, UpdateOrderContactRequest request, int userId)
+        {
+            var order = await _orderRepo.GetByOrderIdAsync(orderId);
+            if (order == null)
+                return (false, "Không tìm thấy đơn hàng.", null);
+
+            if (order.UserId != userId)
+                return (false, "Bạn không có quyền chỉnh sửa đơn hàng này.", null);
+
+            if (order.Status != OrderStatus.ChoXacNhan)
+                return (false,
+                    $"Đơn hàng #{orderId} đang ở trạng thái \"{order.Status}\". " +
+                    "Bạn chỉ có thể cập nhật thông tin liên hệ khi đơn đang ở trạng thái \"Chờ xác nhận\" thôi nhé.", null);
+
+            if (string.IsNullOrWhiteSpace(request.ShippingAddress) && string.IsNullOrWhiteSpace(request.Phone))
+                return (false, "Vui lòng cung cấp ít nhất địa chỉ hoặc số điện thoại cần cập nhật.", null);
+
+            if (!string.IsNullOrWhiteSpace(request.ShippingAddress))
+                order.ShippingAddress = request.ShippingAddress.Trim();
+
+            if (!string.IsNullOrWhiteSpace(request.Phone))
+                order.Phone = request.Phone.Trim();
+
+            await _orderRepo.UpdateAsync(order);
+
             return (true,
-                "Cảm ơn bạn đã xác nhận! Đơn hàng đã hoàn thành. " +
-                "Chúc bạn thưởng thức ngon miệng nhé!");
+                "Cập nhật thông tin liên hệ thành công! Nhân viên sẽ giao hàng theo thông tin mới nhé.",
+                MapToResponse(order));
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -380,7 +437,6 @@ namespace BookingBakery.Application.Service
                     product.Status = "sold_out";
                 }
                 product.UpdatedAt = DateTime.UtcNow;
-
                 await _productRepo.UpdateAsync(p => p.ProductId == item.ProductId, product);
             }
 
@@ -388,15 +444,45 @@ namespace BookingBakery.Application.Service
         }
 
         private static void AppendStatusHistory(
-            Order order, string newStatus, int changedByUserId, string? note)
+            Order order, string newStatus, int changedByUserId, string changedByUserName, string? note)
         {
             order.StatusHistory.Add(new OrderStatusHistory
             {
                 Status = newStatus,
                 ChangedAt = DateTime.UtcNow,
                 ChangedByUserId = changedByUserId,
+                ChangedByUserName = changedByUserName,
                 Note = note
             });
+        }
+
+        private static OrderSummaryResponse MapToSummary(Order o)
+        {
+            var last = o.StatusHistory.LastOrDefault();
+            return new()
+            {
+                OrderId = o.OrderId,
+                UserId = o.UserId,
+                TotalItems = o.Items.Count,
+                TotalQuantity = o.Items.Sum(i => i.Quantity),
+                Status = o.Status,
+                TotalPrice = o.TotalPrice,
+                ShippingAddress = o.ShippingAddress,
+                Phone = o.Phone,
+                Note = o.Note,
+                CancelReason = o.CancelReason,
+                PaymentMethod = o.PaymentMethod,
+                DeliveredAt = o.DeliveredAt,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+                LastStatusChange = last == null ? null : new OrderStatusHistoryResponse
+                {
+                    Status = last.Status,
+                    ChangedAt = last.ChangedAt,
+                    ChangedByUserName = last.ChangedByUserName,
+                    Note = last.Note
+                }
+            };
         }
 
         private static OrderResponse MapToResponse(Order o) => new()
@@ -414,6 +500,7 @@ namespace BookingBakery.Application.Service
             Status = o.Status,
             TotalPrice = o.TotalPrice,
             ShippingAddress = o.ShippingAddress,
+            Phone = o.Phone,
             Note = o.Note,
             CancelReason = o.CancelReason,
             PaymentMethod = o.PaymentMethod,
@@ -424,7 +511,7 @@ namespace BookingBakery.Application.Service
             {
                 Status = h.Status,
                 ChangedAt = h.ChangedAt,
-                ChangedByUserId = h.ChangedByUserId,
+                ChangedByUserName = h.ChangedByUserName,
                 Note = h.Note
             }).ToList()
         };

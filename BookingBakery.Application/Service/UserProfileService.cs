@@ -25,13 +25,27 @@ namespace BookingBakery.Application.Service
         public async Task<UserProfileResponseDto?> GetByUserIdAsync(int userId)
         {
             var profile = await _profileRepository.FindOneAsync(p => p.UserId == userId);
-            return profile == null ? null : MapToDto(profile);
+            if (profile == null) return null;
+            var user = await _authRepository.GetByIdAsync(userId);
+            return MapToDto(profile, user);
         }
 
         public async Task<UserProfileResponseDto> UpsertMyProfileAsync(int userId, UpdateUserProfileDto dto)
         {
             if (dto.Birthday.HasValue)
                 ValidateBirthday(dto.Birthday.Value);
+
+            // Cập nhật Phone vào User nếu có truyền lên
+            if (!string.IsNullOrWhiteSpace(dto.Phone))
+            {
+                var userToUpdate = await _authRepository.GetByIdAsync(userId);
+                if (userToUpdate != null)
+                {
+                    userToUpdate.Phone = dto.Phone.Trim();
+                    userToUpdate.UpdatedAt = DateTime.UtcNow;
+                    await _authRepository.UpdateAsync(u => u.UserId == userId, userToUpdate);
+                }
+            }
 
             var profile = await _profileRepository.FindOneAsync(p => p.UserId == userId);
 
@@ -67,26 +81,44 @@ namespace BookingBakery.Application.Service
                 await _profileRepository.UpdateAsync(p => p.UserId == userId, profile);
             }
 
-            return MapToDto(profile);
+            var user = await _authRepository.GetByIdAsync(userId);
+            return MapToDto(profile, user);
         }
 
         public async Task<IEnumerable<UserProfileResponseDto>> GetAllAsync()
         {
             var profiles = await _profileRepository.GetAllAsync();
-            return profiles.Select(MapToDto);
+            var profileList = profiles.ToList();
+            var userIds = profileList.Select(p => p.UserId).ToHashSet();
+            var users = (await _authRepository.FindManyAsync(u => userIds.Contains(u.UserId))).ToList();
+
+            return profileList.Select(p =>
+            {
+                var user = users.FirstOrDefault(u => u.UserId == p.UserId);
+                return MapToDto(p, user);
+            });
         }
 
         public async Task<UserProfileResponseDto?> GetByProfileIdAsync(int profileId)
         {
             var profile = await _profileRepository.GetByIdAsync(profileId);
-            return profile == null ? null : MapToDto(profile);
+            if (profile == null) return null;
+            var user = await _authRepository.GetByIdAsync(profile.UserId);
+            return MapToDto(profile, user);
         }
 
         public async Task<IEnumerable<UserProfileResponseDto>> GetByUserIdsAsync(IEnumerable<int> userIds)
         {
             var idSet = userIds.ToHashSet();
             var allProfiles = await _profileRepository.GetAllAsync();
-            return allProfiles.Where(p => idSet.Contains(p.UserId)).Select(MapToDto);
+            var filtered = allProfiles.Where(p => idSet.Contains(p.UserId)).ToList();
+            var users = (await _authRepository.FindManyAsync(u => idSet.Contains(u.UserId))).ToList();
+
+            return filtered.Select(p =>
+            {
+                var user = users.FirstOrDefault(u => u.UserId == p.UserId);
+                return MapToDto(p, user);
+            });
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -198,7 +230,7 @@ namespace BookingBakery.Application.Service
                     "Ngày sinh không hợp lệ.");
         }
 
-        private static UserProfileResponseDto MapToDto(UserProfile profile) => new()
+        private static UserProfileResponseDto MapToDto(UserProfile profile, User? user = null) => new()
         {
             ProfileId = profile.ProfileId,
             UserId = profile.UserId,
@@ -207,6 +239,8 @@ namespace BookingBakery.Application.Service
             Gender = profile.Gender,
             Address = profile.Address,
             AvatarUrl = profile.AvatarUrl,
+            Email = user?.Email,
+            Phone = user?.Phone,
             CreatedAt = profile.CreatedAt,
             UpdatedAt = profile.UpdatedAt
         };
