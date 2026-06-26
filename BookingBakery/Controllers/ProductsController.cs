@@ -17,9 +17,6 @@ namespace BookingBakery.Controllers
             _productService = productService;
         }
 
-        /// <summary>
-        /// Xem toàn bộ sản phẩm trong kho (Khách vãng lai cũng xem được)
-        /// </summary>
         [HttpGet]
         [AllowAnonymous]
         [EndpointSummary("Xem toàn bộ sản phẩm trong kho")]
@@ -31,9 +28,6 @@ namespace BookingBakery.Controllers
             return Ok(products);
         }
 
-        /// <summary>
-        /// Xem sản phẩm theo ID
-        /// </summary>
         [HttpGet("{id:int}")]
         [AllowAnonymous]
         [EndpointSummary("Xem sản phẩm theo ID")]
@@ -49,19 +43,26 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Thêm sản phẩm mới vào kho (Chỉ Admin)
-        /// </summary>
+        // Dùng form-data + upload ảnh từ main branch
         [HttpPost]
         [Authorize(Roles = "1")]
+        [Consumes("multipart/form-data")]
         [EndpointSummary("Thêm sản phẩm mới vào kho")]
-        [EndpointDescription("Chỉ Admin. Field status phải điền là 'stock'.")]
+        [EndpointDescription("Chỉ Admin. Dữ liệu gửi dưới dạng form-data kèm theo file hình ảnh bắt buộc (key là 'Image')")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
+        public async Task<IActionResult> Create([FromForm] CreateProductDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (dto.Image == null || dto.Image.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn một file ảnh hợp lệ để tải lên." });
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(dto.Image.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận: .jpg, .jpeg, .png, .gif, .webp" });
 
             try
             {
@@ -74,9 +75,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>
-        /// Cập nhật giá sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/price")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật giá sản phẩm")]
@@ -96,9 +94,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật mô tả sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/description")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật mô tả sản phẩm")]
@@ -118,9 +113,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật số lượng sản phẩm (Admin và Staff)
-        /// </summary>
         [HttpPut("{id:int}/stock")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật số lượng sản phẩm")]
@@ -140,9 +132,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Xóa sản phẩm khỏi kho (Chỉ Admin)
-        /// </summary>
         [HttpDelete("{id:int}")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Xóa sản phẩm khỏi kho")]
@@ -158,9 +147,6 @@ namespace BookingBakery.Controllers
             return Ok(new { message = "Xóa sản phẩm thành công." });
         }
 
-        /// <summary>
-        /// Cập nhật giá sản phẩm theo tên (Chỉ Admin)
-        /// </summary>
         [HttpPut("by-name/{name}/price")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật giá sản phẩm theo tên")]
@@ -180,9 +166,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật mô tả sản phẩm theo tên (Chỉ Admin)
-        /// </summary>
         [HttpPut("by-name/{name}/description")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật mô tả sản phẩm theo tên")]
@@ -202,9 +185,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật số lượng sản phẩm theo tên (Admin và Staff)
-        /// </summary>
         [HttpPut("by-name/{name}/stock")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật số lượng sản phẩm theo tên")]
@@ -224,9 +204,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Tìm kiếm sản phẩm theo tên (Khách vãng lai cũng tìm được)
-        /// </summary>
         [HttpGet("search")]
         [AllowAnonymous]
         [EndpointSummary("Tìm kiếm sản phẩm theo tên")]
@@ -238,9 +215,6 @@ namespace BookingBakery.Controllers
             return Ok(products);
         }
 
-        /// <summary>
-        /// Lấy danh sách sản phẩm theo danh mục (Khách vãng lai cũng xem được)
-        /// </summary>
         [HttpGet("category/{categoryId:int}")]
         [AllowAnonymous]
         [EndpointSummary("Lấy danh sách sản phẩm theo danh mục")]
@@ -253,6 +227,75 @@ namespace BookingBakery.Controllers
             {
                 var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
                 return Ok(products);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // Upload ảnh từ main branch
+        [HttpPut("{id:int}/image")]
+        [Authorize(Roles = "1")]
+        [Consumes("multipart/form-data")]
+        [EndpointSummary("Upload hình ảnh sản phẩm")]
+        [EndpointDescription("Chỉ Admin, file upload qua form-data với key 'file'")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadImage(int id, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn một file ảnh hợp lệ." });
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận: .jpg, .jpeg, .png, .gif, .webp" });
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                var updatedProduct = await _productService.UpdateImageAsync(id, stream, file.FileName);
+
+                if (updatedProduct == null)
+                    return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
+
+                return Ok(updatedProduct);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("by-name/{name}/image")]
+        [Authorize(Roles = "1")]
+        [Consumes("multipart/form-data")]
+        [EndpointSummary("Upload hình ảnh sản phẩm theo tên")]
+        [EndpointDescription("Chỉ Admin, file upload qua form-data với key 'file'")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadImageByName(string name, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn một file ảnh hợp lệ." });
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận: .jpg, .jpeg, .png, .gif, .webp" });
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                var updatedProduct = await _productService.UpdateImageByNameAsync(name, stream, file.FileName);
+
+                if (updatedProduct == null)
+                    return NotFound(new { message = $"Không tìm thấy sản phẩm với tên = {name}." });
+
+                return Ok(updatedProduct);
             }
             catch (InvalidOperationException ex)
             {
