@@ -22,7 +22,7 @@ namespace BookingBakery.Controllers
             _authService = authService;
         }
 
-        // Lấy thông tin profile của chính mình. 
+        // Lấy thông tin profile của chính mình
         [HttpGet("me")]
         [EndpointSummary("Hiển thị profile của account đã được tạo trước đó ")]
         [EndpointDescription("Nếu 1 vài thông tin bị null thì dùng method PUT để chỉnh sửa thêm thông tin ")]
