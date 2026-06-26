@@ -2,6 +2,9 @@ using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
+using BookingBakery.Infrastructure.Helper;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace BookingBakery.Application.Service
 {
@@ -9,11 +12,16 @@ namespace BookingBakery.Application.Service
     {
         private readonly IProductRepository _productRepository;
         private readonly ICategoryRepository _categoryRepository;
+        private readonly HelperCloudinary _cloudinaryHelper;
 
-        public ProductService(IProductRepository productRepository, ICategoryRepository categoryRepository)
+        public ProductService(
+            IProductRepository productRepository, 
+            ICategoryRepository categoryRepository,
+            HelperCloudinary cloudinaryHelper)
         {
             _productRepository = productRepository;
             _categoryRepository = categoryRepository;
+            _cloudinaryHelper = cloudinaryHelper;
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
@@ -67,6 +75,9 @@ namespace BookingBakery.Application.Service
 
         public async Task<ProductDto> AddProductAsync(CreateProductDto dto)
         {
+            if (dto.Image == null || dto.Image.Length == 0)
+                throw new ArgumentException("Hình ảnh sản phẩm là bắt buộc.");
+
             // Kiểm tra category_id có tồn tại không
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId);
             if (category == null)
@@ -76,6 +87,24 @@ namespace BookingBakery.Application.Service
             var existingProduct = await _productRepository.FindOneAsync(p => p.Name.ToLower() == dto.Name.ToLower());
             if (existingProduct != null)
                 throw new InvalidOperationException($"Sản phẩm với tên '{dto.Name}' đã tồn tại.");
+
+            using var imageStream = dto.Image.OpenReadStream();
+            string fileName = dto.Image.FileName;
+
+            // Upload lên Cloudinary
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(fileName, imageStream),
+                Folder = "products/images"
+            };
+
+            var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
+            {
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            }
+
+            string finalImageUrl = uploadResult.SecureUrl.ToString();
 
             var all = await _productRepository.GetAllAsync();
             var nextId = all.Any() ? all.Max(p => p.ProductId) + 1 : 1;
@@ -89,8 +118,8 @@ namespace BookingBakery.Application.Service
                 Price = dto.Price,
                 CostPrice = dto.CostPrice,
                 StockQuantity = dto.StockQuantity,
-                ImageUrl = dto.ImageUrl,
-                Status = dto.StockQuantity > 0 ? "stock" : "sold_out",
+                ImageUrl = finalImageUrl,
+                Status = "stock",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -363,6 +392,92 @@ namespace BookingBakery.Application.Service
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt
             });
+        }
+
+        public async Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == id);
+            if (product == null)
+                return null;
+
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(fileName, imageStream),
+                Folder = "products/images"
+            };
+
+            var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
+            {
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            }
+
+            product.ImageUrl = uploadResult.SecureUrl.ToString();
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _productRepository.UpdateAsync(p => p.ProductId == id, product);
+
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
+            var categoryName = category?.Name ?? "Không xác định";
+
+            return new ProductDto
+            {
+                ProductId = product.ProductId,
+                CategoryId = product.CategoryId,
+                CategoryName = categoryName,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                CostPrice = product.CostPrice,
+                StockQuantity = product.StockQuantity,
+                ImageUrl = product.ImageUrl,
+                Status = product.Status,
+                CreatedAt = product.CreatedAt,
+                UpdatedAt = product.UpdatedAt
+            };
+        }
+
+        public async Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.Name.ToLower() == name.ToLower());
+            if (product == null)
+                return null;
+
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(fileName, imageStream),
+                Folder = "products/images"
+            };
+
+            var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
+            {
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            }
+
+            product.ImageUrl = uploadResult.SecureUrl.ToString();
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _productRepository.UpdateAsync(p => p.ProductId == product.ProductId, product);
+
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
+            var categoryName = category?.Name ?? "Không xác định";
+
+            return new ProductDto
+            {
+                ProductId = product.ProductId,
+                CategoryId = product.CategoryId,
+                CategoryName = categoryName,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                CostPrice = product.CostPrice,
+                StockQuantity = product.StockQuantity,
+                ImageUrl = product.ImageUrl,
+                Status = product.Status,
+                CreatedAt = product.CreatedAt,
+                UpdatedAt = product.UpdatedAt
+            };
         }
     }
 }

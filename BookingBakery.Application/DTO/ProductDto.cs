@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace BookingBakery.Application.DTO
 {
@@ -40,11 +41,8 @@ namespace BookingBakery.Application.DTO
         [Range(0, int.MaxValue, ErrorMessage = "Số lượng tồn kho phải lớn hơn hoặc bằng 0.")]
         public int StockQuantity { get; set; }
 
-        [StringLength(255)]
-        public string? ImageUrl { get; set; }
-
-        [StringLength(20)]
-        public string Status { get; set; } = "stock";
+        [Required(ErrorMessage = "Hình ảnh sản phẩm là bắt buộc.")]
+        public IFormFile Image { get; set; } = null!;
     }
 
     public class UpdateProductStockDto

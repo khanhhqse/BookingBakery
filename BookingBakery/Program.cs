@@ -2,6 +2,7 @@ using BookingBakery.Application.IService;
 using BookingBakery.Application.Service;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Infrastructure.Persistence;
+using BookingBakery.Infrastructure.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -22,6 +23,13 @@ namespace BookingBakery
             builder.Services.AddScoped<IAuthRepository, AuthRepository>();
             builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
+
+
+            builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
+            builder.Services.AddScoped<IProductIngredientRepository, ProductIngredientRepository>();
+
+            // Đăng ký Repository cụ thể cho UserProfile
+
             builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
             builder.Services.AddScoped<ICartRepository, CartRepository>();
             builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
@@ -32,8 +40,23 @@ namespace BookingBakery
             builder.Services.AddScoped<IUserProfileService, UserProfileService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+
+            builder.Services.AddScoped<IIngredientService, IngredientService>();
+            builder.Services.AddScoped<IProductIngredientService, ProductIngredientService>();
+
+
+            
+            builder.Services.AddScoped<ICartRepository, CartRepository>();
+            builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
+
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
+
+            // ─── Cloudinary ──────────────────────────────────────────────
+            var cloudinarySettings = builder.Configuration.GetSection("CloudinarySettings").Get<CloudinarySettings>()
+                ?? throw new InvalidOperationException("CloudinarySettings is not configured.");
+            builder.Services.AddSingleton(cloudinarySettings);
+            builder.Services.AddSingleton<HelperCloudinary>();
 
             // ─── JWT Authentication ──────────────────────────────────────
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -57,6 +80,18 @@ namespace BookingBakery
                     ValidAudience = jwtSettings["Audience"],
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
                 };
+            });
+
+            // ─── CORS Configuration ──────────────────────────────────────
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowFrontend", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5173")
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials();
+                });
             });
 
             builder.Services.AddAuthorization();
@@ -145,6 +180,7 @@ namespace BookingBakery
             }
 
             app.UseHttpsRedirection();
+            app.UseCors("AllowFrontend");
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

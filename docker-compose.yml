@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: bookingbakery-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - bookingbakery-network
+    restart: always
+
+  backend:
+    image: bookingbakery-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bookingbakery-api
+    ports:
+      - "5109:8080"
+    environment:
+      # Chạy dưới môi trường Development để hiển thị Swagger
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Ghi đè Connection String MongoDB trỏ tới container mongodb
+      - MongoDB__ConnectionString=mongodb://mongodb:27017
+      - MongoDB__DatabaseName=BookingBakeryDb
+      # Giữ nguyên cấu hình JWT
+      - JwtSettings__SecretKey=BookingBakery_SuperSecretKey_2024_MustBe32CharsMin!
+      - JwtSettings__Issuer=BookingBakery
+      - JwtSettings__Audience=BookingBakeryClient
+      - JwtSettings__ExpiryMinutes=60
+      # Giữ nguyên cấu hình Cloudinary
+      - CloudinarySettings__CloudName=dsujllmiz
+      - CloudinarySettings__ApiKey=979311875139926
+      - CloudinarySettings__ApiSecret=E4DtR4fJq3Ruq3AsGDc9u9X_BtI
+    depends_on:
+      - mongodb
+    networks:
+      - bookingbakery-network
+    restart: always
+
+volumes:
+  mongodb_data:
+
+networks:
+  bookingbakery-network:
+    driver: bridge
