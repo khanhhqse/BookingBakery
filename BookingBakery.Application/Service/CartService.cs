@@ -207,6 +207,36 @@ namespace BookingBakery.Application.Service
             await TouchCartAsync(cart);
         }
 
+        public async Task<CartDto> RemoveItemsFromCartAsync(int userId, List<int> productIds)
+        {
+            if (productIds == null || productIds.Count == 0)
+                throw new InvalidOperationException("Vui lòng chọn ít nhất một sản phẩm để xóa.");
+
+            var cart = await GetOrCreateCartAsync(userId);
+
+            // Kiểm tra từng productId có trong giỏ không
+            var notFoundIds = new List<int>();
+            foreach (var productId in productIds)
+            {
+                var item = await _cartItemRepository.FindOneAsync(
+                    ci => ci.CartId == cart.CartId && ci.ProductId == productId);
+
+                if (item == null)
+                    notFoundIds.Add(productId);
+            }
+
+            if (notFoundIds.Count > 0)
+                throw new InvalidOperationException(
+                    $"Một số sản phẩm không có trong giỏ hàng của bạn: {string.Join(", ", notFoundIds.Select(id => $"#{id}"))}.");
+
+            // Xóa tất cả các item được chọn
+            await _cartItemRepository.DeleteManyAsync(
+                ci => ci.CartId == cart.CartId && productIds.Contains(ci.ProductId));
+
+            await TouchCartAsync(cart);
+            return await GetCartByUserIdAsync(userId);
+        }
+
         private async Task<Cart> GetOrCreateCartAsync(int userId)
         {
             var cart = await _cartRepository.FindOneAsync(c => c.UserId == userId);

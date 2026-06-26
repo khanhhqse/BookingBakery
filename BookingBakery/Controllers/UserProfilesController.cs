@@ -118,5 +118,45 @@ namespace BookingBakery.Controllers
             var profiles = await _profileService.GetByUserIdsAsync(customerUserIds);
             return Ok(profiles);
         }
+
+        // ════════════════════════════════════════════════════════════════
+        // Thêm endpoint này vào UserProfilesController.cs
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>Tìm kiếm khách hàng theo tên, email, giới tính, địa chỉ, sinh nhật</summary>
+        [HttpGet("customers/search")]
+        [Authorize(Roles = "1,2")] // Admin + Staff
+        [EndpointSummary("Tìm kiếm khách hàng")]
+        [EndpointDescription(
+            "Tất cả filter đều optional và có thể kết hợp. " +
+            "Name/Email/Address tìm gần đúng (không phân biệt hoa thường). " +
+            "Gender khớp chính xác: 'Nam' | 'Nữ' | 'Khác'. " +
+            "BirthMonth: 1-12, BirthYear: VD 2000.")]
+        [ProducesResponseType(typeof(List<CustomerSearchResponse>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SearchCustomers([FromQuery] CustomerSearchRequest request)
+        {
+            var (success, message, results) = await _profileService.SearchCustomersAsync(request);
+            return Ok(new { message, data = results });
+        }
+
+        [HttpPut("me/change-password")]
+        [Authorize(Roles = "1,2,3")]
+        [EndpointSummary("Đổi mật khẩu")]
+        [EndpointDescription("Yêu cầu nhập đúng mật khẩu hiện tại. Mật khẩu mới phải khác mật khẩu cũ và ít nhất 6 ký tự.")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = GetCurrentUserId();
+
+            var (success, message) = await _authService.ChangePasswordAsync(userId, dto);
+
+            return success
+                ? Ok(new { message })
+                : BadRequest(new { message });
+        }
     }
 }

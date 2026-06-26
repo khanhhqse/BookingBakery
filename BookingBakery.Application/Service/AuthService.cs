@@ -93,6 +93,29 @@ namespace BookingBakery.Application.Service
                 .Select(MapToUserResponseDto);
         }
 
+        public async Task<(bool Success, string Message)> ChangePasswordAsync(
+    int userId, ChangePasswordDto dto)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                return (false, "Không tìm thấy tài khoản.");
+
+            // Xác minh mật khẩu cũ
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+                return (false, "Mật khẩu hiện tại không đúng. Vui lòng kiểm tra lại.");
+
+            // Không cho đặt mật khẩu mới trùng mật khẩu cũ
+            if (BCrypt.Net.BCrypt.Verify(dto.NewPassword, user.PasswordHash))
+                return (false, "Mật khẩu mới không được trùng với mật khẩu hiện tại.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userRepository.UpdateAsync(u => u.UserId == userId, user);
+
+            return (true, "Đổi mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới nhé!");
+        }
+
         private static UserResponseDto MapToUserResponseDto(User user)
         {
             return new UserResponseDto

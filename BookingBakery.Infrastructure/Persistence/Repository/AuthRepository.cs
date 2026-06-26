@@ -30,6 +30,11 @@ namespace BookingBakery.Infrastructure.Persistence
             return await _collection.Find(filter).FirstOrDefaultAsync();
         }
 
+        public async Task<IEnumerable<User>> FindManyAsync(Expression<Func<User, bool>> filter)
+        {
+            return await _collection.Find(filter).ToListAsync();
+        }
+
         public async Task CreateAsync(User entity)
         {
             await _collection.InsertOneAsync(entity);

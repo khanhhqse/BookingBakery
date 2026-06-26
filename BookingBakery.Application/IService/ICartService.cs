@@ -9,5 +9,6 @@ namespace BookingBakery.Application.IService
         Task<CartDto> UpdateItemQuantityAsync(int userId, int productId, int quantity);
         Task<CartDto> RemoveItemFromCartAsync(int userId, int productId);
         Task ClearCartAsync(int userId);
+        Task<CartDto> RemoveItemsFromCartAsync(int userId, List<int> productIds);
     }
 }

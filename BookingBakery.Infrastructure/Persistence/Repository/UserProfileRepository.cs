@@ -44,5 +44,10 @@ namespace BookingBakery.Infrastructure.Persistence
         {
             await _collection.DeleteOneAsync(filter);
         }
+        public async Task<IEnumerable<UserProfile>> FindManyAsync(
+    Expression<Func<UserProfile, bool>> filter)
+        {
+            return await _collection.Find(filter).ToListAsync();
+        }
     }
 }

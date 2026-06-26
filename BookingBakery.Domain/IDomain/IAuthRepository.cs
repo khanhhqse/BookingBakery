@@ -11,5 +11,6 @@ namespace BookingBakery.Domain.IDomain
         Task CreateAsync(User entity);
         Task UpdateAsync(Expression<Func<User, bool>> filter, User entity);
         Task DeleteAsync(Expression<Func<User, bool>> filter);
+        Task<IEnumerable<User>> FindManyAsync(Expression<Func<User, bool>> filter);
     }
 }

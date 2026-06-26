@@ -108,6 +108,27 @@ namespace BookingBakery.Controllers
             return Ok(new { message = "Đã xóa toàn bộ giỏ hàng." });
         }
 
+        [HttpDelete("items")]
+        [EndpointSummary("Xóa nhiều sản phẩm khỏi giỏ hàng")]
+        [EndpointDescription("Truyền danh sách productId vào body để xóa nhiều sản phẩm cùng lúc. VD: [1,2] -> productId 1 và 2 sẽ bị xóa")]
+        [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RemoveItems([FromBody] List<int> productIds)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            try
+            {
+                var cart = await _cartService.RemoveItemsFromCartAsync(userId.Value, productIds);
+                return Ok(cart);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         private int? GetCurrentUserId()
         {
             // AuthService phát token với claim "sub" = user.UserId.
