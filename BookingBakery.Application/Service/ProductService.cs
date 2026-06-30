@@ -479,5 +479,58 @@ namespace BookingBakery.Application.Service
                 UpdatedAt = product.UpdatedAt
             };
         }
+
+        public async Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == id);
+            if (product == null)
+                return null;
+
+            // 1. Cập nhật CategoryId nếu được truyền vào
+            if (dto.CategoryId.HasValue)
+            {
+                var categoryExists = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId.Value);
+                if (categoryExists == null)
+                    throw new InvalidOperationException($"Danh mục với ID = {dto.CategoryId.Value} không tồn tại.");
+
+                product.CategoryId = dto.CategoryId.Value;
+            }
+
+            // 2. Cập nhật Name nếu được truyền vào và không trống
+            if (!string.IsNullOrWhiteSpace(dto.Name))
+            {
+                var trimmedName = dto.Name.Trim();
+                var existingByName = await _productRepository.FindOneAsync(p => p.Name.ToLower() == trimmedName.ToLower() && p.ProductId != id);
+                if (existingByName != null)
+                    throw new InvalidOperationException($"Sản phẩm với tên '{trimmedName}' đã tồn tại.");
+
+                product.Name = trimmedName;
+            }
+
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _productRepository.UpdateAsync(p => p.ProductId == id, product);
+
+            // Lấy lại thông tin danh mục hiện tại để hiển thị tên danh mục
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
+            var categoryName = category?.Name ?? "Không xác định";
+
+            return new ProductDto
+            {
+                ProductId = product.ProductId,
+                CategoryId = product.CategoryId,
+                CategoryName = categoryName,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                CostPrice = product.CostPrice,
+                StockQuantity = product.StockQuantity,
+                ImageUrl = product.ImageUrl,
+                Status = product.Status,
+                CreatedAt = product.CreatedAt,
+                UpdatedAt = product.UpdatedAt
+            };
+        }
     }
 }
+

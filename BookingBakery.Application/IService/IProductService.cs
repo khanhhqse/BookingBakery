@@ -18,5 +18,6 @@ namespace BookingBakery.Application.IService
         Task<bool> DeleteProductAsync(int id);
         Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName);
         Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName);
+        Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto);
     }
 }

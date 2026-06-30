@@ -109,6 +109,35 @@ namespace BookingBakery.Controllers
         }
 
         /// <summary>
+        /// Cập nhật tên và danh mục của sản phẩm (Chỉ Admin)
+        /// </summary>
+        [HttpPut("{id:int}/name-category")]
+        [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật tên và danh mục của sản phẩm")]
+        [EndpointDescription("Chỉ Admin. Cập nhật tên sản phẩm và Category ID theo ID sản phẩm.")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateNameAndCategory(int id, [FromBody] UpdateProductNameAndCategoryDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var product = await _productService.UpdateNameAndCategoryAsync(id, dto);
+                if (product == null)
+                    return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
+
+                return Ok(product);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Cập nhật mô tả sản phẩm (Chỉ Admin)
         /// </summary>
         [HttpPut("{id:int}/description")]

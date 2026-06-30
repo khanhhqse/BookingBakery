@@ -63,4 +63,13 @@ namespace BookingBakery.Application.DTO
     {
         public string? Description { get; set; }
     }
+
+    public class UpdateProductNameAndCategoryDto
+    {
+        [StringLength(100, ErrorMessage = "Tên sản phẩm không quá 100 ký tự.")]
+        public string? Name { get; set; }
+
+        public int? CategoryId { get; set; }
+    }
 }
+
