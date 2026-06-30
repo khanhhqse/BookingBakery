@@ -8,8 +8,17 @@ namespace BookingBakery.Application.DTO
         public string ProductName { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
         public decimal Price { get; set; }
+
+        /// <summary>Giá sau khuyến mãi (nếu có Promotion active). Bằng Price nếu không có.</summary>
+        public decimal SalePrice { get; set; }
+
+        /// <summary>True nếu sản phẩm đang có khuyến mãi.</summary>
+        public bool HasActivePromotion { get; set; }
+
         public int Quantity { get; set; }
-        public decimal Subtotal => Price * Quantity;
+
+        /// <summary>Tính theo SalePrice — đây là số tiền thực tế phải trả.</summary>
+        public decimal Subtotal => SalePrice * Quantity;
     }
 
     public class CartDto

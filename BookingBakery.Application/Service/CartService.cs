@@ -10,15 +10,18 @@ namespace BookingBakery.Application.Service
         private readonly ICartRepository _cartRepository;
         private readonly ICartItemRepository _cartItemRepository;
         private readonly IProductRepository _productRepository;
+        private readonly IPromotionPriceHelper _promotionPriceHelper;
 
         public CartService(
             ICartRepository cartRepository,
             ICartItemRepository cartItemRepository,
-            IProductRepository productRepository)
+            IProductRepository productRepository,
+            IPromotionPriceHelper promotionPriceHelper)
         {
             _cartRepository = cartRepository;
             _cartItemRepository = cartItemRepository;
             _productRepository = productRepository;
+            _promotionPriceHelper = promotionPriceHelper; 
         }
 
         public async Task<CartDto> GetCartByUserIdAsync(int userId)
@@ -70,6 +73,8 @@ namespace BookingBakery.Application.Service
                     adjustedNotices.Add(
                         $"Sản phẩm \"{product.Name}\" hiện không còn đủ số lượng như trong giỏ hàng của bạn, chúng tôi đã điều chỉnh giảm số lượng giúp bạn, mời bạn kiểm tra lại giỏ hàng nhé.");
                 }
+                var (salePrice, hasPromotion, _) = await _promotionPriceHelper.GetSalePriceAsync(
+                    product.ProductId, product.Price);
 
                 itemDtos.Add(new CartItemDto
                 {
@@ -77,6 +82,8 @@ namespace BookingBakery.Application.Service
                     ProductName = product.Name,
                     ImageUrl = product.ImageUrl,
                     Price = product.Price,
+                    SalePrice = salePrice,
+                    HasActivePromotion = hasPromotion,
                     Quantity = quantity
                 });
             }

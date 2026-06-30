@@ -52,6 +52,14 @@ namespace BookingBakery
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
 
+            builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+            builder.Services.AddScoped<IProductPromotionRepository, ProductPromotionRepository>();
+
+            builder.Services.AddScoped<IPromotionService, PromotionService>();
+            builder.Services.AddScoped<IPromotionPriceHelper, PromotionPriceHelper>();
+
+
+
             // ─── Cloudinary ──────────────────────────────────────────────
             var cloudinarySettings = builder.Configuration.GetSection("CloudinarySettings").Get<CloudinarySettings>()
                 ?? throw new InvalidOperationException("CloudinarySettings is not configured.");

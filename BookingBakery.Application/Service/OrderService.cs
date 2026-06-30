@@ -13,6 +13,7 @@ namespace BookingBakery.Application.Service
         private readonly IProductRepository _productRepo;
         private readonly IUserProfileRepository _profileRepo;
         private readonly IAuthRepository _authRepo;
+        private readonly IPromotionPriceHelper _promotionPriceHelper;
 
         public OrderService(
             IOrderRepository orderRepo,
@@ -20,7 +21,8 @@ namespace BookingBakery.Application.Service
             ICartItemRepository cartItemRepo,
             IProductRepository productRepo,
             IUserProfileRepository profileRepo,
-            IAuthRepository authRepo)
+            IAuthRepository authRepo,
+            IPromotionPriceHelper promotionPriceHelper)
         {
             _orderRepo = orderRepo;
             _cartRepo = cartRepo;
@@ -28,6 +30,7 @@ namespace BookingBakery.Application.Service
             _productRepo = productRepo;
             _profileRepo = profileRepo;
             _authRepo = authRepo;
+            _promotionPriceHelper = promotionPriceHelper;
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -97,14 +100,16 @@ namespace BookingBakery.Application.Service
                     insufficientStockProducts.Add($"\"{product.Name}\"");
                     continue;
                 }
+                var (salePrice, _, _) = await _promotionPriceHelper.GetSalePriceAsync(
+                    product.ProductId, product.Price);
 
                 orderItems.Add(new OrderItem
                 {
                     ProductId = product.ProductId,
                     ProductName = product.Name,
                     Quantity = cartItem.Quantity,
-                    UnitPrice = product.Price,
-                    TotalPrice = product.Price * cartItem.Quantity
+                    UnitPrice = salePrice,                       // ← giá đã áp khuyến mãi
+                    TotalPrice = salePrice * cartItem.Quantity
                 });
             }
 

@@ -13,15 +13,18 @@ namespace BookingBakery.Application.Service
         private readonly IProductRepository _productRepository;
         private readonly ICategoryRepository _categoryRepository;
         private readonly HelperCloudinary _cloudinaryHelper;
+        private readonly IPromotionPriceHelper _promotionPriceHelper;
 
         public ProductService(
-            IProductRepository productRepository, 
+            IProductRepository productRepository,
             ICategoryRepository categoryRepository,
-            HelperCloudinary cloudinaryHelper)
+            HelperCloudinary cloudinaryHelper,
+            IPromotionPriceHelper promotionPriceHelper)
         {
             _productRepository = productRepository;
             _categoryRepository = categoryRepository;
             _cloudinaryHelper = cloudinaryHelper;
+            _promotionPriceHelper = promotionPriceHelper;
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
@@ -30,21 +33,14 @@ namespace BookingBakery.Application.Service
             var categories = await _categoryRepository.GetAllAsync();
             var categoryMap = categories.ToDictionary(c => c.CategoryId, c => c.Name);
 
-            return products.Select(p => new ProductDto
+            var result = new List<ProductDto>();
+            foreach (var p in products)
             {
-                ProductId = p.ProductId,
-                CategoryId = p.CategoryId,
-                CategoryName = categoryMap.TryGetValue(p.CategoryId, out var name) ? name : "Không xác định",
-                Name = p.Name,
-                Description = p.Description,
-                Price = p.Price,
-                CostPrice = p.CostPrice,
-                StockQuantity = p.StockQuantity,
-                ImageUrl = p.ImageUrl,
-                Status = p.Status,
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
-            });
+                var categoryName = categoryMap.TryGetValue(p.CategoryId, out var name) ? name : "Không xác định";
+                result.Add(await MapToDtoAsync(p, categoryName));
+            }
+
+            return result;
         }
 
         public async Task<ProductDto?> GetProductByIdAsync(int id)
@@ -56,21 +52,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == p.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = p.ProductId,
-                CategoryId = p.CategoryId,
-                CategoryName = categoryName,
-                Name = p.Name,
-                Description = p.Description,
-                Price = p.Price,
-                CostPrice = p.CostPrice,
-                StockQuantity = p.StockQuantity,
-                ImageUrl = p.ImageUrl,
-                Status = p.Status,
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
-            };
+            return await MapToDtoAsync(p, categoryName);
         }
 
         public async Task<ProductDto> AddProductAsync(CreateProductDto dto)
@@ -78,12 +60,10 @@ namespace BookingBakery.Application.Service
             if (dto.Image == null || dto.Image.Length == 0)
                 throw new ArgumentException("Hình ảnh sản phẩm là bắt buộc.");
 
-            // Kiểm tra category_id có tồn tại không
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId);
             if (category == null)
                 throw new InvalidOperationException($"Danh mục với ID = {dto.CategoryId} không tồn tại.");
 
-            // Kiểm tra trùng tên sản phẩm
             var existingProduct = await _productRepository.FindOneAsync(p => p.Name.ToLower() == dto.Name.ToLower());
             if (existingProduct != null)
                 throw new InvalidOperationException($"Sản phẩm với tên '{dto.Name}' đã tồn tại.");
@@ -91,7 +71,6 @@ namespace BookingBakery.Application.Service
             using var imageStream = dto.Image.OpenReadStream();
             string fileName = dto.Image.FileName;
 
-            // Upload lên Cloudinary
             var uploadParams = new ImageUploadParams
             {
                 File = new FileDescription(fileName, imageStream),
@@ -100,9 +79,7 @@ namespace BookingBakery.Application.Service
 
             var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
             if (uploadResult.Error != null)
-            {
                 throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
-            }
 
             string finalImageUrl = uploadResult.SecureUrl.ToString();
 
@@ -126,21 +103,7 @@ namespace BookingBakery.Application.Service
 
             await _productRepository.CreateAsync(product);
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = category.Name,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, category.Name);
         }
 
         public async Task<ProductDto?> UpdateStockAsync(int id, int quantity)
@@ -150,7 +113,6 @@ namespace BookingBakery.Application.Service
                 return null;
 
             product.StockQuantity = quantity;
-            // Tự động cập nhật status khi tồn kho thay đổi
             product.Status = quantity > 0 ? "stock" : "sold_out";
             product.UpdatedAt = DateTime.UtcNow;
 
@@ -159,21 +121,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<ProductDto?> UpdatePriceAsync(int id, decimal price)
@@ -190,21 +138,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<ProductDto?> UpdateDescriptionAsync(int id, string? description)
@@ -221,21 +155,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<bool> DeleteProductAsync(int id)
@@ -255,7 +175,6 @@ namespace BookingBakery.Application.Service
                 return null;
 
             product.StockQuantity = quantity;
-            // Tự động cập nhật status khi tồn kho thay đổi
             product.Status = quantity > 0 ? "stock" : "sold_out";
             product.UpdatedAt = DateTime.UtcNow;
 
@@ -264,21 +183,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<ProductDto?> UpdatePriceByNameAsync(string name, decimal price)
@@ -295,21 +200,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<ProductDto?> UpdateDescriptionByNameAsync(string name, string? description)
@@ -326,21 +217,7 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
         public async Task<IEnumerable<ProductDto>> SearchProductsByNameAsync(string name)
@@ -349,23 +226,16 @@ namespace BookingBakery.Application.Service
             var categories = await _categoryRepository.GetAllAsync();
             var categoryMap = categories.ToDictionary(c => c.CategoryId, c => c.Name);
 
-            var filteredProducts = products.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+            var filtered = products.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
 
-            return filteredProducts.Select(p => new ProductDto
+            var result = new List<ProductDto>();
+            foreach (var p in filtered)
             {
-                ProductId = p.ProductId,
-                CategoryId = p.CategoryId,
-                CategoryName = categoryMap.TryGetValue(p.CategoryId, out var catName) ? catName : "Không xác định",
-                Name = p.Name,
-                Description = p.Description,
-                Price = p.Price,
-                CostPrice = p.CostPrice,
-                StockQuantity = p.StockQuantity,
-                ImageUrl = p.ImageUrl,
-                Status = p.Status,
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
-            });
+                var categoryName = categoryMap.TryGetValue(p.CategoryId, out var catName) ? catName : "Không xác định";
+                result.Add(await MapToDtoAsync(p, categoryName));
+            }
+
+            return result;
         }
 
         public async Task<IEnumerable<ProductDto>> GetProductsByCategoryIdAsync(int categoryId)
@@ -375,23 +245,13 @@ namespace BookingBakery.Application.Service
                 throw new InvalidOperationException($"Danh mục với ID = {categoryId} không tồn tại.");
 
             var products = await _productRepository.GetAllAsync();
-            var filteredProducts = products.Where(p => p.CategoryId == categoryId);
+            var filtered = products.Where(p => p.CategoryId == categoryId);
 
-            return filteredProducts.Select(p => new ProductDto
-            {
-                ProductId = p.ProductId,
-                CategoryId = p.CategoryId,
-                CategoryName = category.Name,
-                Name = p.Name,
-                Description = p.Description,
-                Price = p.Price,
-                CostPrice = p.CostPrice,
-                StockQuantity = p.StockQuantity,
-                ImageUrl = p.ImageUrl,
-                Status = p.Status,
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt
-            });
+            var result = new List<ProductDto>();
+            foreach (var p in filtered)
+                result.Add(await MapToDtoAsync(p, category.Name));
+
+            return result;
         }
 
         public async Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName)
@@ -408,9 +268,7 @@ namespace BookingBakery.Application.Service
 
             var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
             if (uploadResult.Error != null)
-            {
                 throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
-            }
 
             product.ImageUrl = uploadResult.SecureUrl.ToString();
             product.UpdatedAt = DateTime.UtcNow;
@@ -420,21 +278,33 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
+        }
+
+        public async Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == id);
+            if (product == null)
+                return null;
+
+            // Kiểm tra category mới có tồn tại không
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId);
+            if (category == null)
+                throw new InvalidOperationException($"Danh mục với ID = {dto.CategoryId} không tồn tại.");
+
+            // Kiểm tra trùng tên với sản phẩm khác (trừ chính nó)
+            var existingProduct = await _productRepository.FindOneAsync(
+                p => p.Name.ToLower() == dto.Name.ToLower() && p.ProductId != id);
+            if (existingProduct != null)
+                throw new InvalidOperationException($"Sản phẩm với tên '{dto.Name}' đã tồn tại.");
+
+            product.Name = dto.Name;
+            product.CategoryId = dto.CategoryId;
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _productRepository.UpdateAsync(p => p.ProductId == id, product);
+
+            return await MapToDtoAsync(product, category.Name);
         }
 
         public async Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName)
@@ -451,9 +321,7 @@ namespace BookingBakery.Application.Service
 
             var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
             if (uploadResult.Error != null)
-            {
                 throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
-            }
 
             product.ImageUrl = uploadResult.SecureUrl.ToString();
             product.UpdatedAt = DateTime.UtcNow;
@@ -463,74 +331,36 @@ namespace BookingBakery.Application.Service
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
             var categoryName = category?.Name ?? "Không xác định";
 
-            return new ProductDto
-            {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
-                CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
-            };
+            return await MapToDtoAsync(product, categoryName);
         }
 
-        public async Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto)
+        // ──────────────────────────────────────────────────────────────
+        // PRIVATE HELPER — map Product -> ProductDto kèm SalePrice
+        // ──────────────────────────────────────────────────────────────
+
+        private async Task<ProductDto> MapToDtoAsync(Product p, string categoryName)
         {
-            var product = await _productRepository.FindOneAsync(p => p.ProductId == id);
-            if (product == null)
-                return null;
-
-            // 1. Cập nhật CategoryId nếu được truyền vào
-            if (dto.CategoryId.HasValue)
-            {
-                var categoryExists = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId.Value);
-                if (categoryExists == null)
-                    throw new InvalidOperationException($"Danh mục với ID = {dto.CategoryId.Value} không tồn tại.");
-
-                product.CategoryId = dto.CategoryId.Value;
-            }
-
-            // 2. Cập nhật Name nếu được truyền vào và không trống
-            if (!string.IsNullOrWhiteSpace(dto.Name))
-            {
-                var trimmedName = dto.Name.Trim();
-                var existingByName = await _productRepository.FindOneAsync(p => p.Name.ToLower() == trimmedName.ToLower() && p.ProductId != id);
-                if (existingByName != null)
-                    throw new InvalidOperationException($"Sản phẩm với tên '{trimmedName}' đã tồn tại.");
-
-                product.Name = trimmedName;
-            }
-
-            product.UpdatedAt = DateTime.UtcNow;
-
-            await _productRepository.UpdateAsync(p => p.ProductId == id, product);
-
-            // Lấy lại thông tin danh mục hiện tại để hiển thị tên danh mục
-            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == product.CategoryId);
-            var categoryName = category?.Name ?? "Không xác định";
+            var (salePrice, hasPromotion, promotionTitle) =
+                await _promotionPriceHelper.GetSalePriceAsync(p.ProductId, p.Price);
 
             return new ProductDto
             {
-                ProductId = product.ProductId,
-                CategoryId = product.CategoryId,
+                ProductId = p.ProductId,
+                CategoryId = p.CategoryId,
                 CategoryName = categoryName,
-                Name = product.Name,
-                Description = product.Description,
-                Price = product.Price,
-                CostPrice = product.CostPrice,
-                StockQuantity = product.StockQuantity,
-                ImageUrl = product.ImageUrl,
-                Status = product.Status,
-                CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
+                Name = p.Name,
+                Description = p.Description,
+                Price = p.Price,
+                CostPrice = p.CostPrice,
+                SalePrice = salePrice,
+                HasActivePromotion = hasPromotion,
+                ActivePromotionTitle = promotionTitle,
+                StockQuantity = p.StockQuantity,
+                ImageUrl = p.ImageUrl,
+                Status = p.Status,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt
             };
         }
     }
 }
-

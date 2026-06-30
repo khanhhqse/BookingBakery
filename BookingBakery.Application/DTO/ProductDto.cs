@@ -12,6 +12,14 @@ namespace BookingBakery.Application.DTO
         public string? Description { get; set; }
         public decimal Price { get; set; }
         public decimal CostPrice { get; set; }
+        /// <summary>
+        /// Giá sau khi áp Promotion đang diễn ra (nếu có). Bằng Price nếu không có promotion.
+        /// </summary>
+        public decimal SalePrice { get; set; }
+        /// <summary>True nếu sản phẩm đang được áp 1 chương trình khuyến mãi.</summary>
+        public bool HasActivePromotion { get; set; }
+        /// <summary>Tên chương trình khuyến mãi đang áp (nếu có).</summary>
+        public string? ActivePromotionTitle { get; set; }
         public int StockQuantity { get; set; }
         public string? ImageUrl { get; set; }
         public string Status { get; set; } = string.Empty;
@@ -66,10 +74,11 @@ namespace BookingBakery.Application.DTO
 
     public class UpdateProductNameAndCategoryDto
     {
+        [Required(ErrorMessage = "Tên sản phẩm là bắt buộc.")]
         [StringLength(100, ErrorMessage = "Tên sản phẩm không quá 100 ký tự.")]
-        public string? Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
-        public int? CategoryId { get; set; }
+        [Required(ErrorMessage = "Category ID là bắt buộc.")]
+        public int CategoryId { get; set; }
     }
 }
-
