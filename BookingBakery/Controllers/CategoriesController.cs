@@ -54,14 +54,23 @@ namespace BookingBakery.Controllers
         /// Thêm danh mục mới (Chỉ Admin và Staff)
         /// </summary>
         [HttpPost]
+        [Consumes("multipart/form-data")]
         [EndpointSummary("Thêm danh mục mới")]
         [EndpointDescription("Chỉ Admin và Staff")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromBody] CreateCategoryDto dto)
+        public async Task<IActionResult> Create([FromForm] CreateCategoryDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (dto.Image != null && dto.Image.Length > 0)
+            {
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+                var extension = Path.GetExtension(dto.Image.FileName).ToLower();
+                if (!allowedExtensions.Contains(extension))
+                    return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận các định dạng ảnh: .jpg, .jpeg, .png, .gif, .webp" });
+            }
 
             try
             {
@@ -150,6 +159,78 @@ namespace BookingBakery.Controllers
                     return NotFound(new { message = $"Không tìm thấy danh mục với tên = {name}." });
 
                 return Ok(category);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật hình ảnh danh mục theo ID (Chỉ Admin và Staff)
+        /// </summary>
+        [HttpPut("{id:int}/image")]
+        [Consumes("multipart/form-data")]
+        [EndpointSummary("Cập nhật hình ảnh danh mục")]
+        [EndpointDescription("Chỉ Admin và Staff, file upload qua form-data với key 'file'")]
+        [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadImage(int id, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn một file ảnh hợp lệ." });
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận các định dạng ảnh: .jpg, .jpeg, .png, .gif, .webp" });
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                var updatedCategory = await _categoryService.UpdateCategoryImageAsync(id, stream, file.FileName);
+                
+                if (updatedCategory == null)
+                    return NotFound(new { message = $"Không tìm thấy danh mục với ID = {id}." });
+
+                return Ok(updatedCategory);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật hình ảnh danh mục theo tên (Chỉ Admin và Staff)
+        /// </summary>
+        [HttpPut("by-name/{name}/image")]
+        [Consumes("multipart/form-data")]
+        [EndpointSummary("Cập nhật hình ảnh danh mục theo tên")]
+        [EndpointDescription("Chỉ Admin và Staff, file upload qua form-data với key 'file'")]
+        [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UploadImageByName(string name, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn một file ảnh hợp lệ." });
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng file không hợp lệ. Chỉ chấp nhận các định dạng ảnh: .jpg, .jpeg, .png, .gif, .webp" });
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                var updatedCategory = await _categoryService.UpdateCategoryImageByNameAsync(name, stream, file.FileName);
+                
+                if (updatedCategory == null)
+                    return NotFound(new { message = $"Không tìm thấy danh mục với tên = {name}." });
+
+                return Ok(updatedCategory);
             }
             catch (InvalidOperationException ex)
             {
