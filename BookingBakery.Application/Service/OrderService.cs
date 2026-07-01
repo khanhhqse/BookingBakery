@@ -49,13 +49,10 @@ namespace BookingBakery.Application.Service
             if (cartItems.Count == 0)
                 return (false, "Giỏ hàng của bạn đang trống. Vui lòng thêm ít nhất một sản phẩm trước khi đặt hàng.", null);
 
-            // ── Auto-fill Phone và Address từ UserProfile nếu không truyền lên ──
             var profile = await _profileRepo.FindOneAsync(p => p.UserId == userId);
-
             var shippingAddress = request.ShippingAddress?.Trim();
             var phone = request.Phone?.Trim();
 
-            // "" hoặc null → auto-fill từ UserProfile.Address
             if (string.IsNullOrWhiteSpace(shippingAddress))
             {
                 shippingAddress = profile?.Address?.Trim();
@@ -65,16 +62,13 @@ namespace BookingBakery.Application.Service
                         + "Vui lòng cập nhật tại mục \"Hồ sơ của tôi\" hoặc nhập trực tiếp khi đặt hàng nhé.", null);
             }
 
-            // Validate độ dài sau khi đã auto-fill
             if (shippingAddress.Length < 10 || shippingAddress.Length > 255)
                 return (false, "Địa chỉ giao hàng phải từ 10 đến 255 ký tự.", null);
 
-            // Coi "" và "   " đều là "không truyền" → auto-fill từ User
             if (string.IsNullOrWhiteSpace(phone))
             {
                 var user = await _authRepo.GetByIdAsync(userId);
                 phone = user?.Phone?.Trim();
-
                 if (string.IsNullOrWhiteSpace(phone))
                     return (false,
                         "Bạn chưa có số điện thoại trong hồ sơ. " +
@@ -100,6 +94,7 @@ namespace BookingBakery.Application.Service
                     insufficientStockProducts.Add($"\"{product.Name}\"");
                     continue;
                 }
+
                 var (salePrice, _, _) = await _promotionPriceHelper.GetSalePriceAsync(
                     product.ProductId, product.Price);
 
@@ -108,7 +103,7 @@ namespace BookingBakery.Application.Service
                     ProductId = product.ProductId,
                     ProductName = product.Name,
                     Quantity = cartItem.Quantity,
-                    UnitPrice = salePrice,                       // ← giá đã áp khuyến mãi
+                    UnitPrice = salePrice,
                     TotalPrice = salePrice * cartItem.Quantity
                 });
             }
@@ -137,7 +132,6 @@ namespace BookingBakery.Application.Service
                 _ => "COD"
             };
 
-            // Lấy tên user để ghi vào statusHistory
             var userName = profile?.FullName ?? $"User #{userId}";
 
             var order = new Order
@@ -157,11 +151,11 @@ namespace BookingBakery.Application.Service
                 {
                     new()
                     {
-                        Status              = OrderStatus.ChoXacNhan,
-                        ChangedAt           = now,
-                        ChangedByUserId     = userId,
-                        ChangedByUserName   = userName,
-                        Note                = "Khách hàng tạo đơn hàng"
+                        Status            = OrderStatus.ChoXacNhan,
+                        ChangedAt         = now,
+                        ChangedByUserId   = userId,
+                        ChangedByUserName = userName,
+                        Note              = "Khách hàng tạo đơn hàng"
                     }
                 }
             };
@@ -169,7 +163,9 @@ namespace BookingBakery.Application.Service
             await _orderRepo.CreateAsync(order);
             await _cartItemRepo.DeleteManyAsync(ci => ci.CartId == cart.CartId);
 
-            return (true, "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.", MapToResponse(order));
+            return (true,
+                "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.",
+                await MapToResponseAsync(order));
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -179,7 +175,10 @@ namespace BookingBakery.Application.Service
             int userId)
         {
             var orders = await _orderRepo.GetByUserIdAsync(userId);
-            var responses = orders.Select(MapToSummary).ToList();
+            var profile = await _profileRepo.FindOneAsync(p => p.UserId == userId);
+            var name = profile?.FullName ?? $"User #{userId}";
+
+            var responses = orders.Select(o => MapToSummary(o, name)).ToList();
             return (true, "Lấy danh sách đơn hàng thành công.", responses);
         }
 
@@ -196,7 +195,7 @@ namespace BookingBakery.Application.Service
             if (userRole == "3" && order.UserId != requestUserId)
                 return (false, "Bạn không có quyền xem đơn hàng này.", null);
 
-            return (true, "Lấy chi tiết đơn hàng thành công.", MapToResponse(order));
+            return (true, "Lấy chi tiết đơn hàng thành công.", await MapToResponseAsync(order));
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -225,8 +224,22 @@ namespace BookingBakery.Application.Service
                     toDate = DateTime.SpecifyKind(request.ToDate.Value.Date, DateTimeKind.Utc).AddHours(17).AddSeconds(-1);
             }
 
-            var orders = await _orderRepo.GetAllAsync(request.Page, request.PageSize, request.Status, fromDate, toDate);
-            var responses = orders.Select(MapToSummary).ToList();
+            var orders = await _orderRepo.GetAllAsync(
+                request.Page, request.PageSize, request.Status, fromDate, toDate);
+
+            // Batch load profiles để tránh N+1
+            var userIds = orders.Select(o => o.UserId).Distinct().ToList();
+            var profiles = new Dictionary<int, string>();
+            foreach (var uid in userIds)
+            {
+                var p = await _profileRepo.FindOneAsync(pr => pr.UserId == uid);
+                profiles[uid] = p?.FullName ?? $"User #{uid}";
+            }
+
+            var responses = orders.Select(o =>
+                MapToSummary(o, profiles.TryGetValue(o.UserId, out var n) ? n : $"User #{o.UserId}"))
+                .ToList();
+
             return (true, $"Lấy danh sách đơn hàng thành công (trang {request.Page}).", responses);
         }
 
@@ -377,7 +390,7 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 8. CẬP NHẬT SĐT VÀ ĐỊA CHỈ (Customer — chỉ khi "Chờ xác nhận")
+        // 8. CẬP NHẬT SĐT VÀ ĐỊA CHỈ
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message, OrderResponse? Order)> UpdateOrderContactAsync(
             int orderId, UpdateOrderContactRequest request, int userId)
@@ -407,7 +420,7 @@ namespace BookingBakery.Application.Service
 
             return (true,
                 "Cập nhật thông tin liên hệ thành công! Nhân viên sẽ giao hàng theo thông tin mới nhé.",
-                MapToResponse(order));
+                await MapToResponseAsync(order));
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -461,13 +474,58 @@ namespace BookingBakery.Application.Service
             });
         }
 
-        private static OrderSummaryResponse MapToSummary(Order o)
+        /// <summary>
+        /// Join UserProfile để lấy CustomerName — dùng cho GetOrderDetail và PlaceOrder.
+        /// </summary>
+        private async Task<OrderResponse> MapToResponseAsync(Order o)
+        {
+            var profile = await _profileRepo.FindOneAsync(p => p.UserId == o.UserId);
+            var customerName = profile?.FullName ?? $"User #{o.UserId}";
+
+            return new OrderResponse
+            {
+                OrderId = o.OrderId,
+                UserId = o.UserId,
+                CustomerName = customerName,
+                Items = o.Items.Select(i => new OrderItemResponse
+                {
+                    ProductId = i.ProductId,
+                    ProductName = i.ProductName,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice
+                }).ToList(),
+                Status = o.Status,
+                TotalPrice = o.TotalPrice,
+                ShippingAddress = o.ShippingAddress,
+                Phone = o.Phone,
+                Note = o.Note,
+                CancelReason = o.CancelReason,
+                PaymentMethod = o.PaymentMethod,
+                DeliveredAt = o.DeliveredAt,
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+                StatusHistory = o.StatusHistory.Select(h => new OrderStatusHistoryResponse
+                {
+                    Status = h.Status,
+                    ChangedAt = h.ChangedAt,
+                    ChangedByUserName = h.ChangedByUserName,
+                    Note = h.Note
+                }).ToList()
+            };
+        }
+
+        /// <summary>
+        /// Dùng cho danh sách — truyền customerName từ ngoài để tránh query lặp.
+        /// </summary>
+        private static OrderSummaryResponse MapToSummary(Order o, string customerName)
         {
             var last = o.StatusHistory.LastOrDefault();
             return new()
             {
                 OrderId = o.OrderId,
                 UserId = o.UserId,
+                CustomerName = customerName,
                 TotalItems = o.Items.Count,
                 TotalQuantity = o.Items.Sum(i => i.Quantity),
                 Status = o.Status,
@@ -489,36 +547,5 @@ namespace BookingBakery.Application.Service
                 }
             };
         }
-
-        private static OrderResponse MapToResponse(Order o) => new()
-        {
-            OrderId = o.OrderId,
-            UserId = o.UserId,
-            Items = o.Items.Select(i => new OrderItemResponse
-            {
-                ProductId = i.ProductId,
-                ProductName = i.ProductName,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
-            }).ToList(),
-            Status = o.Status,
-            TotalPrice = o.TotalPrice,
-            ShippingAddress = o.ShippingAddress,
-            Phone = o.Phone,
-            Note = o.Note,
-            CancelReason = o.CancelReason,
-            PaymentMethod = o.PaymentMethod,
-            DeliveredAt = o.DeliveredAt,
-            CreatedAt = o.CreatedAt,
-            UpdatedAt = o.UpdatedAt,
-            StatusHistory = o.StatusHistory.Select(h => new OrderStatusHistoryResponse
-            {
-                Status = h.Status,
-                ChangedAt = h.ChangedAt,
-                ChangedByUserName = h.ChangedByUserName,
-                Note = h.Note
-            }).ToList()
-        };
     }
 }

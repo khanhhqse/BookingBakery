@@ -102,6 +102,7 @@ namespace BookingBakery.Application.DTO
     {
         public int OrderId { get; set; }
         public int UserId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
         public int TotalItems { get; set; }
         public int TotalQuantity { get; set; }
         public string Status { get; set; } = string.Empty;
@@ -121,6 +122,7 @@ namespace BookingBakery.Application.DTO
     {
         public int OrderId { get; set; }
         public int UserId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
         public List<OrderItemResponse> Items { get; set; } = new();
         public string Status { get; set; } = string.Empty;
         public decimal TotalPrice { get; set; }
