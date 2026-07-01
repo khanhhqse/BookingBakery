@@ -17,5 +17,8 @@ namespace BookingBakery.Domain.Models
 
         [BsonElement("description")]
         public string? Description { get; set; }
+
+        [BsonElement("image_url")]
+        public string? ImageUrl { get; set; }
     }
 }

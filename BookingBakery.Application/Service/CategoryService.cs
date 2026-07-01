@@ -2,16 +2,24 @@ using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
+using BookingBakery.Infrastructure.Helper;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using System.IO;
 
 namespace BookingBakery.Application.Service
 {
     public class CategoryService : ICategoryService
     {
         private readonly ICategoryRepository _categoryRepository;
+        private readonly HelperCloudinary _cloudinaryHelper;
 
-        public CategoryService(ICategoryRepository categoryRepository)
+        public CategoryService(
+            ICategoryRepository categoryRepository,
+            HelperCloudinary cloudinaryHelper)
         {
             _categoryRepository = categoryRepository;
+            _cloudinaryHelper = cloudinaryHelper;
         }
 
         public async Task<IEnumerable<CategoryDto>> GetAllCategoriesAsync()
@@ -21,7 +29,8 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = c.CategoryId,
                 Name = c.Name,
-                Description = c.Description
+                Description = c.Description,
+                ImageUrl = c.ImageUrl
             });
         }
 
@@ -35,7 +44,8 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
-                Description = category.Description
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
             };
         }
 
@@ -46,6 +56,25 @@ namespace BookingBakery.Application.Service
             if (existingCategory != null)
                 throw new InvalidOperationException("Tên danh mục đã tồn tại.");
 
+            string? imageUrl = null;
+            if (dto.Image != null && dto.Image.Length > 0)
+            {
+                using var imageStream = dto.Image.OpenReadStream();
+                var uploadParams = new ImageUploadParams
+                {
+                    File = new FileDescription(dto.Image.FileName, imageStream),
+                    Folder = "categories/images"
+                };
+
+                var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+                if (uploadResult.Error != null)
+                {
+                    throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+                }
+
+                imageUrl = uploadResult.SecureUrl.ToString();
+            }
+
             var all = await _categoryRepository.GetAllAsync();
             var nextId = all.Any() ? all.Max(c => c.CategoryId) + 1 : 1;
 
@@ -53,7 +82,8 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = nextId,
                 Name = dto.Name,
-                Description = dto.Description
+                Description = dto.Description,
+                ImageUrl = imageUrl
             };
 
             await _categoryRepository.CreateAsync(category);
@@ -62,7 +92,8 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
-                Description = category.Description
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
             };
         }
 
@@ -88,7 +119,8 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
-                Description = category.Description
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
             };
         }
 
@@ -138,7 +170,70 @@ namespace BookingBakery.Application.Service
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
-                Description = category.Description
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
+            };
+        }
+
+        public async Task<CategoryDto?> UpdateCategoryImageAsync(int id, Stream imageStream, string fileName)
+        {
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == id);
+            if (category == null)
+                return null;
+
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(fileName, imageStream),
+                Folder = "categories/images"
+            };
+
+            var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
+            {
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            }
+
+            category.ImageUrl = uploadResult.SecureUrl.ToString();
+
+            await _categoryRepository.UpdateAsync(c => c.CategoryId == id, category);
+
+            return new CategoryDto
+            {
+                CategoryId = category.CategoryId,
+                Name = category.Name,
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
+            };
+        }
+
+        public async Task<CategoryDto?> UpdateCategoryImageByNameAsync(string name, Stream imageStream, string fileName)
+        {
+            var category = await _categoryRepository.FindOneAsync(c => c.Name.ToLower() == name.ToLower());
+            if (category == null)
+                return null;
+
+            var uploadParams = new ImageUploadParams
+            {
+                File = new FileDescription(fileName, imageStream),
+                Folder = "categories/images"
+            };
+
+            var uploadResult = await _cloudinaryHelper.CloudinaryInstance.UploadAsync(uploadParams);
+            if (uploadResult.Error != null)
+            {
+                throw new InvalidOperationException($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            }
+
+            category.ImageUrl = uploadResult.SecureUrl.ToString();
+
+            await _categoryRepository.UpdateAsync(c => c.CategoryId == category.CategoryId, category);
+
+            return new CategoryDto
+            {
+                CategoryId = category.CategoryId,
+                Name = category.Name,
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
             };
         }
     }
