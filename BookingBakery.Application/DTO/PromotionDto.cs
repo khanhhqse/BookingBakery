@@ -41,8 +41,10 @@ namespace BookingBakery.Application.DTO
         [Required(ErrorMessage = "Vui lòng chọn ngày kết thúc.")]
         public DateTime EndDate { get; set; }
 
-        /// <summary>Danh sách product_id muốn gắn vào chương trình khuyến mãi này.</summary>
-        public List<int> ProductIds { get; set; } = new();
+        /// <summary>
+        /// Danh sách product_id muốn gắn ngay lúc tạo — để trống nếu muốn gắn sau.
+        /// </summary>
+        public List<int>? ProductIds { get; set; }
     }
 
     public class UpdatePromotionRequest
@@ -66,8 +68,21 @@ namespace BookingBakery.Application.DTO
         public DateTime? EndDate { get; set; }
     }
 
-    /// <summary>Gắn thêm / bỏ sản phẩm khỏi chương trình khuyến mãi.</summary>
-    public class UpdatePromotionProductsRequest
+    /// <summary>Gắn thêm sản phẩm vào chương trình khuyến mãi.</summary>
+    public class AddPromotionProductRequest
+    {
+        [Required(ErrorMessage = "Vui lòng cung cấp danh sách sản phẩm.")]
+        public List<int> ProductIds { get; set; } = new();
+
+        /// <summary>
+        /// Danh sách size được áp promotion. Để trống = áp tất cả size.
+        /// VD: ["L", "XL"] = chỉ giảm size L và XL.
+        /// </summary>
+        public List<string> ApplicableSizes { get; set; } = new();
+    }
+
+    /// <summary>Gỡ sản phẩm khỏi chương trình khuyến mãi.</summary>
+    public class RemovePromotionProductRequest
     {
         [Required(ErrorMessage = "Vui lòng cung cấp danh sách sản phẩm.")]
         public List<int> ProductIds { get; set; } = new();
@@ -82,8 +97,18 @@ namespace BookingBakery.Application.DTO
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
+        /// <summary>Danh sách size với giá gốc và giá sale tương ứng.</summary>
+        public List<PromotionSizeItem> Sizes { get; set; } = new();
+        /// <summary>Các size được áp promotion. Empty = tất cả size.</summary>
+        public List<string> ApplicableSizes { get; set; } = new();
+    }
+
+    public class PromotionSizeItem
+    {
+        public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public decimal SalePrice { get; set; }
+        public bool HasPromotion { get; set; }
     }
 
     public class PromotionResponse

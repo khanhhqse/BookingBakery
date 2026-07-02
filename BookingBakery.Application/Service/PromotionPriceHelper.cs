@@ -17,16 +17,17 @@ namespace BookingBakery.Application.Service
             _promotionRepo = promotionRepo;
         }
 
-        public async Task<(decimal SalePrice, bool HasActivePromotion, string? PromotionTitle)> GetSalePriceAsync(
-            int productId, decimal originalPrice)
+        public async Task<Dictionary<string, (decimal SalePrice, bool HasPromotion)>> GetSalePricesAsync(
+            int productId, List<(string Name, decimal Price)> sizes)
         {
+            var result = sizes.ToDictionary(
+                s => s.Name,
+                s => (SalePrice: s.Price, HasPromotion: false));
+
             var links = await _productPromotionRepo.GetByProductIdAsync(productId);
-            if (links.Count == 0)
-                return (originalPrice, false, null);
+            if (links.Count == 0) return result;
 
             var now = DateTime.UtcNow;
-            decimal? bestSalePrice = null;
-            string? bestTitle = null;
 
             foreach (var link in links)
             {
@@ -36,22 +37,66 @@ namespace BookingBakery.Application.Service
                 var isOngoing = promotion.Status == PromotionStatus.Active
                              && promotion.StartDate <= now
                              && promotion.EndDate >= now;
-
                 if (!isOngoing) continue;
 
-                var salePrice = CalculateSalePrice(originalPrice, promotion);
+                // Xác định size nào được áp — empty = tất cả
+                var targetSizes = link.ApplicableSizes == null || link.ApplicableSizes.Count == 0
+                    ? sizes.Select(s => s.Name).ToList()
+                    : link.ApplicableSizes;
 
-                // Nếu có nhiều promotion active cùng lúc → chọn giá thấp nhất
-                if (bestSalePrice == null || salePrice < bestSalePrice)
+                foreach (var sizeName in targetSizes)
                 {
-                    bestSalePrice = salePrice;
-                    bestTitle = promotion.Title;
+                    var sizeInfo = sizes.FirstOrDefault(s =>
+                        s.Name.Equals(sizeName, StringComparison.OrdinalIgnoreCase));
+
+                    if (sizeInfo.Name == null) continue;
+
+                    var salePrice = CalculateSalePrice(sizeInfo.Price, promotion);
+
+                    // Chọn giá thấp nhất nếu nhiều promotion active
+                    if (!result.ContainsKey(sizeInfo.Name) || salePrice < result[sizeInfo.Name].SalePrice)
+                        result[sizeInfo.Name] = (salePrice, true);
                 }
             }
 
+            return result;
+        }
+
+        public async Task<(decimal SalePrice, bool HasPromotion)> GetSalePriceForSizeAsync(
+            int productId, string sizeName, decimal originalPrice)
+        {
+            var links = await _productPromotionRepo.GetByProductIdAsync(productId);
+            if (links.Count == 0) return (originalPrice, false);
+
+            var now = DateTime.UtcNow;
+            decimal? bestSalePrice = null;
+
+            foreach (var link in links)
+            {
+                var promotion = await _promotionRepo.GetByIdAsync(link.PromotionId);
+                if (promotion == null) continue;
+
+                var isOngoing = promotion.Status == PromotionStatus.Active
+                             && promotion.StartDate <= now
+                             && promotion.EndDate >= now;
+                if (!isOngoing) continue;
+
+                // Kiểm tra size có được áp không
+                var appliesToSize = link.ApplicableSizes == null
+                                 || link.ApplicableSizes.Count == 0
+                                 || link.ApplicableSizes.Any(s =>
+                                        s.Equals(sizeName, StringComparison.OrdinalIgnoreCase));
+
+                if (!appliesToSize) continue;
+
+                var salePrice = CalculateSalePrice(originalPrice, promotion);
+                if (bestSalePrice == null || salePrice < bestSalePrice)
+                    bestSalePrice = salePrice;
+            }
+
             return bestSalePrice.HasValue
-                ? (bestSalePrice.Value, true, bestTitle)
-                : (originalPrice, false, null);
+                ? (bestSalePrice.Value, true)
+                : (originalPrice, false);
         }
 
         public static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)

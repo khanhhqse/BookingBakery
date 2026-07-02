@@ -3,6 +3,26 @@ using Microsoft.AspNetCore.Http;
 
 namespace BookingBakery.Application.DTO
 {
+    public class ProductSizeDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        /// <summary>Giá sau khi áp promotion (nếu có). Bằng Price nếu không có.</summary>
+        public decimal SalePrice { get; set; }
+        public bool HasPromotion { get; set; }
+    }
+
+    public class ProductSizeRequest
+    {
+        [Required(ErrorMessage = "Vui lòng nhập tên size.")]
+        [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên size phải từ 1 đến 20 ký tự.")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng nhập giá cho size này.")]
+        [Range(0, double.MaxValue, ErrorMessage = "Giá phải lớn hơn hoặc bằng 0.")]
+        public decimal Price { get; set; }
+    }
+
     public class ProductDto
     {
         public int ProductId { get; set; }
@@ -10,19 +30,14 @@ namespace BookingBakery.Application.DTO
         public string CategoryName { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public decimal Price { get; set; }
+        public string? StorageInstructions { get; set; }
         public decimal CostPrice { get; set; }
-        /// <summary>
-        /// Giá sau khi áp Promotion đang diễn ra (nếu có). Bằng Price nếu không có promotion.
-        /// </summary>
-        public decimal SalePrice { get; set; }
-        /// <summary>True nếu sản phẩm đang được áp 1 chương trình khuyến mãi.</summary>
         public bool HasActivePromotion { get; set; }
-        /// <summary>Tên chương trình khuyến mãi đang áp (nếu có).</summary>
         public string? ActivePromotionTitle { get; set; }
         public int StockQuantity { get; set; }
         public string? ImageUrl { get; set; }
         public string Status { get; set; } = string.Empty;
+        public List<ProductSizeDto> Sizes { get; set; } = new();
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
@@ -38,6 +53,8 @@ namespace BookingBakery.Application.DTO
 
         public string? Description { get; set; }
 
+        public string? StorageInstructions { get; set; }
+
         [Required(ErrorMessage = "Giá bán là bắt buộc.")]
         [Range(0, double.MaxValue, ErrorMessage = "Giá bán phải lớn hơn hoặc bằng 0.")]
         public decimal Price { get; set; }
@@ -51,6 +68,14 @@ namespace BookingBakery.Application.DTO
 
         [Required(ErrorMessage = "Hình ảnh sản phẩm là bắt buộc.")]
         public IFormFile Image { get; set; } = null!;
+
+        /// <summary>
+        /// Size đầu tiên khi tạo sản phẩm (S, M, L...).
+        /// Thêm size với giá sau bằng POST /api/Products/{id}/sizes.
+        /// </summary>
+        [Required(ErrorMessage = "Vui lòng nhập tên size đầu tiên.")]
+        [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên size phải từ 1 đến 20 ký tự.")]
+        public string SizeName { get; set; } = string.Empty;
     }
 
     public class UpdateProductStockDto
@@ -80,5 +105,18 @@ namespace BookingBakery.Application.DTO
 
         [Required(ErrorMessage = "Category ID là bắt buộc.")]
         public int CategoryId { get; set; }
+    }
+
+    public class UpdateProductStorageInstructionsDto
+    {
+        public string? StorageInstructions { get; set; }
+    }
+
+    /// <summary>Cập nhật toàn bộ danh sách size — thay thế list cũ.</summary>
+    public class UpdateProductSizesDto
+    {
+        [Required(ErrorMessage = "Vui lòng thêm ít nhất một size.")]
+        [MinLength(1, ErrorMessage = "Vui lòng thêm ít nhất một size.")]
+        public List<ProductSizeRequest> Sizes { get; set; } = new();
     }
 }

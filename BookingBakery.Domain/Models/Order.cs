@@ -3,6 +3,10 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BookingBakery.Domain.Models
 {
+    /// <summary>
+    /// Item nhúng vào Order (embedded document).
+    /// Lưu snapshot giá + size tại thời điểm đặt hàng.
+    /// </summary>
     public class OrderItem
     {
         [BsonElement("product_id")]
@@ -11,9 +15,14 @@ namespace BookingBakery.Domain.Models
         [BsonElement("product_name")]
         public string ProductName { get; set; } = string.Empty;
 
+        /// <summary>Size đã chọn lúc đặt hàng (snapshot).</summary>
+        [BsonElement("size_name")]
+        public string SizeName { get; set; } = string.Empty;
+
         [BsonElement("quantity")]
         public int Quantity { get; set; }
 
+        /// <summary>Giá đã áp promotion (nếu có) của size đã chọn.</summary>
         [BsonElement("unit_price")]
         [BsonRepresentation(BsonType.Decimal128)]
         public decimal UnitPrice { get; set; }
@@ -39,6 +48,10 @@ namespace BookingBakery.Domain.Models
         [BsonElement("items")]
         public List<OrderItem> Items { get; set; } = new();
 
+        /// <summary>
+        /// Vòng đời: "Chờ xác nhận" → "Đang làm" → "Đang giao" → "Hoàn thành"
+        /// Hoặc "Đã hủy" tại các bước cho phép.
+        /// </summary>
         [BsonElement("status")]
         public string Status { get; set; } = OrderStatus.ChoXacNhan;
 
@@ -56,12 +69,15 @@ namespace BookingBakery.Domain.Models
         [BsonElement("note")]
         public string? Note { get; set; }
 
+        /// <summary>Lý do hủy — bắt buộc khi hủy đơn (BR-L06).</summary>
         [BsonElement("cancel_reason")]
         public string? CancelReason { get; set; }
 
+        /// <summary>Phương thức thanh toán: "COD" | "Chuyển khoản".</summary>
         [BsonElement("payment_method")]
         public string PaymentMethod { get; set; } = string.Empty;
 
+        /// <summary>Thời điểm chuyển sang "Đang giao" — dùng để tính auto-complete 48h (BR-L03).</summary>
         [BsonElement("delivered_at")]
         public DateTime? DeliveredAt { get; set; }
 
@@ -71,6 +87,7 @@ namespace BookingBakery.Domain.Models
         [BsonElement("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        /// <summary>Lịch sử thay đổi trạng thái (BR-L06).</summary>
         [BsonElement("status_history")]
         public List<OrderStatusHistory> StatusHistory { get; set; } = new();
     }
@@ -86,7 +103,7 @@ namespace BookingBakery.Domain.Models
         [BsonElement("changed_by_user_id")]
         public int ChangedByUserId { get; set; }
 
-        /// <summary>Lưu tên người thay đổi tại thời điểm ghi — tránh join sau này.</summary>
+        /// <summary>Tên người thay đổi — lưu tại thời điểm ghi để tránh join sau này.</summary>
         [BsonElement("changed_by_user_name")]
         public string ChangedByUserName { get; set; } = string.Empty;
 
@@ -101,12 +118,5 @@ namespace BookingBakery.Domain.Models
         public const string DangGiao = "Đang giao";
         public const string HoanThanh = "Hoàn thành";
         public const string DaHuy = "Đã hủy";
-    }
-
-    public static class PaymentStatusConst
-    {
-        public const string ChoThanhToan = "Chờ thanh toán";
-        public const string DaThanhToan = "Đã thanh toán";
-        public const string ThanhToanThatBai = "Thanh toán thất bại";
     }
 }

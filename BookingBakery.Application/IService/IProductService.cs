@@ -10,6 +10,7 @@ namespace BookingBakery.Application.IService
         Task<ProductDto?> UpdateStockAsync(int id, int quantity);
         Task<ProductDto?> UpdatePriceAsync(int id, decimal price);
         Task<ProductDto?> UpdateDescriptionAsync(int id, string? description);
+        Task<ProductDto?> UpdateStorageInstructionsAsync(int id, string? storageInstructions);
         Task<ProductDto?> UpdateStockByNameAsync(string name, int quantity);
         Task<ProductDto?> UpdatePriceByNameAsync(string name, decimal price);
         Task<ProductDto?> UpdateDescriptionByNameAsync(string name, string? description);
@@ -19,5 +20,11 @@ namespace BookingBakery.Application.IService
         Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName);
         Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName);
         Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto);
+
+        /// <summary>Thêm 1 size mới vào sản phẩm.</summary>
+        Task<ProductDto?> AddSizeAsync(int id, ProductSizeRequest request);
+
+        /// <summary>Thay thế toàn bộ danh sách size của sản phẩm.</summary>
+        Task<ProductDto?> UpdateSizesAsync(int id, UpdateProductSizesDto dto);
     }
 }

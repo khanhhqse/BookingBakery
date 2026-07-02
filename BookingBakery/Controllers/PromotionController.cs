@@ -21,8 +21,8 @@ namespace BookingBakery.Controllers
         [HttpPost]
         [Authorize(Roles = "1,2")]
         [Consumes("multipart/form-data")]
-        [EndpointSummary("Tạo chương trình khuyến mãi mới")]
-        [EndpointDescription("Admin và Staff. Dữ liệu gửi dưới dạng form-data, ảnh banner bắt buộc (key 'BannerImage'). ProductIds có thể để trống rồi gắn sau qua endpoint riêng. Discount type 1 là giảm theo %, 2 là tiền cố định")]
+        [EndpointSummary("Admin và Staff tạo chương trình khuyến mãi mới")]
+        [EndpointDescription("ProductIds có thể để trống rồi gắn sau qua endpoint riêng. Nếu gắn productIds ở api này, promotion sẽ apply tất cả các size. Nếu muốn apply 1 số size thì dùng api khác để thêm sản phẩm vào promotion. Discount type 1: giảm theo %, 2 là giảm giá tiền cố định.")]
         [ProducesResponseType(typeof(PromotionResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] CreatePromotionRequest request)
@@ -113,12 +113,12 @@ namespace BookingBakery.Controllers
         [HttpPost("{promotionId:int}/products")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Thêm sản phẩm vào chương trình khuyến mãi")]
-        [EndpointDescription("Admin và Staff. Truyền danh sách ProductIds cần thêm.")]
+        [EndpointDescription("Admin và Staff. Truyền ProductIds và ApplicableSizes (để trống = áp tất cả size).")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AddProducts(
             [FromRoute] int promotionId,
-            [FromBody] UpdatePromotionProductsRequest request)
+            [FromBody] AddPromotionProductRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -138,7 +138,7 @@ namespace BookingBakery.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RemoveProducts(
             [FromRoute] int promotionId,
-            [FromBody] UpdatePromotionProductsRequest request)
+            [FromBody] RemovePromotionProductRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);

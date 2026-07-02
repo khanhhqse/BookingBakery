@@ -95,16 +95,14 @@ namespace BookingBakery.Application.Service
                     continue;
                 }
 
-                var (salePrice, _, _) = await _promotionPriceHelper.GetSalePriceAsync(
-                    product.ProductId, product.Price);
-
                 orderItems.Add(new OrderItem
                 {
                     ProductId = product.ProductId,
                     ProductName = product.Name,
+                    SizeName = cartItem.SizeName,
                     Quantity = cartItem.Quantity,
-                    UnitPrice = salePrice,
-                    TotalPrice = salePrice * cartItem.Quantity
+                    UnitPrice = cartItem.SizePrice,
+                    TotalPrice = cartItem.SizePrice * cartItem.Quantity
                 });
             }
 
@@ -491,6 +489,7 @@ namespace BookingBakery.Application.Service
                 {
                     ProductId = i.ProductId,
                     ProductName = i.ProductName,
+                    SizeName = i.SizeName,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     TotalPrice = i.TotalPrice

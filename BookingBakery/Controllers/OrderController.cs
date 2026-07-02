@@ -26,7 +26,7 @@ namespace BookingBakery.Controllers
         [HttpPost]
         [Authorize(Roles = "3")]
         [EndpointSummary("Đặt hàng từ giỏ hàng hiện tại")]
-        [EndpointDescription("Phone và ShippingAddress có thể để trống — hệ thống sẽ tự lấy từ hồ sơ cá nhân. Nếu hồ sơ cũng không có sẽ báo lỗi yêu cầu cập nhật.")]
+        [EndpointDescription("Phone và ShippingAddress có thể để trống — hệ thống sẽ tự lấy từ hồ sơ cá nhân. Nếu hồ sơ cũng không có sẽ báo lỗi yêu cầu cập nhật. Payment method 1 = COD, 2 = BankTransfer.")]
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)

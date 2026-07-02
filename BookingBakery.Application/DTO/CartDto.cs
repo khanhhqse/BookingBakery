@@ -7,17 +7,21 @@ namespace BookingBakery.Application.DTO
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
+
+        /// <summary>Giá gốc của size đã chọn.</summary>
         public decimal Price { get; set; }
 
-        /// <summary>Giá sau khuyến mãi (nếu có Promotion active). Bằng Price nếu không có.</summary>
+        /// <summary>Giá sau khuyến mãi (nếu có). Bằng Price nếu không có promotion.</summary>
         public decimal SalePrice { get; set; }
 
-        /// <summary>True nếu sản phẩm đang có khuyến mãi.</summary>
         public bool HasActivePromotion { get; set; }
+
+        /// <summary>Size đã chọn.</summary>
+        public string SizeName { get; set; } = string.Empty;
 
         public int Quantity { get; set; }
 
-        /// <summary>Tính theo SalePrice — đây là số tiền thực tế phải trả.</summary>
+        /// <summary>Tính theo SalePrice — số tiền thực tế phải trả.</summary>
         public decimal Subtotal => SalePrice * Quantity;
     }
 
@@ -28,13 +32,8 @@ namespace BookingBakery.Application.DTO
         public List<CartItemDto> Items { get; set; } = new();
         public decimal TotalAmount => Items.Sum(i => i.Subtotal);
         public int TotalQuantity => Items.Sum(i => i.Quantity);
-
-        // BR-C03: sản phẩm bị tự xóa khỏi giỏ (hết hàng/không còn tồn tại)
         public List<string> RemovedItemNotices { get; set; } = new();
-
-        // Mới: sản phẩm bị tự giảm số lượng vì tồn kho không đủ
         public List<string> AdjustedItemNotices { get; set; } = new();
-
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
@@ -43,6 +42,10 @@ namespace BookingBakery.Application.DTO
     {
         [Required(ErrorMessage = "Product ID là bắt buộc.")]
         public int ProductId { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng chọn size.")]
+        [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên size không hợp lệ.")]
+        public string SizeName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Số lượng là bắt buộc.")]
         [Range(1, 50, ErrorMessage = "Số lượng phải từ 1 đến 50.")]

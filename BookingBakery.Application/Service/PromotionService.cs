@@ -49,7 +49,7 @@ namespace BookingBakery.Application.Service
             var validProductIds = new List<int>();
             var invalidProductIds = new List<int>();
 
-            foreach (var productId in request.ProductIds.Distinct())
+            foreach (var productId in (request.ProductIds ?? new List<int>()).Distinct())
             {
                 var product = await _productRepo.GetByIdAsync(productId);
                 if (product == null)
@@ -270,7 +270,7 @@ namespace BookingBakery.Application.Service
         // 7. THÊM SẢN PHẨM VÀO PROMOTION
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> AddProductsAsync(
-            int promotionId, UpdatePromotionProductsRequest request)
+            int promotionId, AddPromotionProductRequest request)
         {
             var promotion = await _promotionRepo.GetByIdAsync(promotionId);
             if (promotion == null)
@@ -300,6 +300,9 @@ namespace BookingBakery.Application.Service
                 {
                     PromotionId = promotionId,
                     ProductId = productId,
+                    ApplicableSizes = request.ApplicableSizes
+                                          .Select(s => s.Trim().ToUpper())
+                                          .ToList(),
                     CreatedAt = DateTime.UtcNow
                 });
                 added.Add(productId);
@@ -320,7 +323,7 @@ namespace BookingBakery.Application.Service
         // 8. GỠ SẢN PHẨM KHỎI PROMOTION
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> RemoveProductsAsync(
-            int promotionId, UpdatePromotionProductsRequest request)
+            int promotionId, RemovePromotionProductRequest request)
         {
             var promotion = await _promotionRepo.GetByIdAsync(promotionId);
             if (promotion == null)
@@ -348,15 +351,32 @@ namespace BookingBakery.Application.Service
                 var product = await _productRepo.GetByIdAsync(link.ProductId);
                 if (product == null) continue;
 
-                var salePrice = isOngoing ? CalculateSalePrice(product.Price, p) : product.Price;
+                var applicableSizes = link.ApplicableSizes ?? new List<string>();
+                var sizesToApply = applicableSizes.Count == 0
+                    ? product.Sizes.Select(s => s.Name).ToList()
+                    : applicableSizes;
+
+                var sizeItems = product.Sizes.Select(s =>
+                {
+                    var applies = isOngoing && sizesToApply.Any(
+                        n => n.Equals(s.Name, StringComparison.OrdinalIgnoreCase));
+                    var salePrice = applies ? CalculateSalePrice(s.Price, p) : s.Price;
+                    return new PromotionSizeItem
+                    {
+                        Name = s.Name,
+                        Price = s.Price,
+                        SalePrice = salePrice,
+                        HasPromotion = applies
+                    };
+                }).ToList();
 
                 products.Add(new PromotionProductItem
                 {
                     ProductId = product.ProductId,
                     ProductName = product.Name,
                     ImageUrl = product.ImageUrl,
-                    Price = product.Price,
-                    SalePrice = salePrice
+                    Sizes = sizeItems,
+                    ApplicableSizes = applicableSizes
                 });
             }
 
@@ -398,19 +418,8 @@ namespace BookingBakery.Application.Service
             };
         }
 
-        /// <summary>
-        /// Tính giá sau giảm theo Promotion. Dùng chung cho PromotionService và ProductService.
-        /// </summary>
-        public static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)
-        {
-            decimal salePrice;
-
-            if (promotion.DiscountType == PromotionDiscountType.Percent)
-                salePrice = originalPrice - (originalPrice * promotion.DiscountValue / 100);
-            else
-                salePrice = originalPrice - promotion.DiscountValue;
-
-            return salePrice < 0 ? 0 : salePrice;
-        }
+        /// <summary>Tính giá sau giảm — dùng chung qua PromotionPriceHelper.</summary>
+        private static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)
+            => PromotionPriceHelper.CalculateSalePrice(originalPrice, promotion);
     }
 }

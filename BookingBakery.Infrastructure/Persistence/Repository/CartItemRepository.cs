@@ -1,5 +1,6 @@
 ﻿using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
+using BookingBakery.Infrastructure.Persistence;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 
@@ -13,15 +14,26 @@ namespace BookingBakery.Infrastructure.Persistence
         {
             _collection = context.GetCollection<CartItem>("cartitems");
 
-            // Composite key (cart_id, product_id): unique compound index
-            var indexKeys = Builders<CartItem>.IndexKeys
+            // Drop index cũ (cart_id, product_id) nếu còn tồn tại
+            try
+            {
+                _collection.Indexes.DropOne("cart_id_1_product_id_1");
+            }
+            catch { /* Index không tồn tại thì bỏ qua */ }
+
+            // Tạo index mới: composite key (cart_id, product_id, size_name)
+            var idxKeys = Builders<CartItem>.IndexKeys
                 .Ascending(ci => ci.CartId)
-                .Ascending(ci => ci.ProductId);
+                .Ascending(ci => ci.ProductId)
+                .Ascending(ci => ci.SizeName);
 
-            var indexModel = new CreateIndexModel<CartItem>(
-                indexKeys, new CreateIndexOptions { Unique = true });
-
-            _collection.Indexes.CreateOne(indexModel);
+            _collection.Indexes.CreateOne(
+                new CreateIndexModel<CartItem>(idxKeys,
+                    new CreateIndexOptions
+                    {
+                        Unique = true,
+                        Name = "idx_cart_product_size_unique"
+                    }));
         }
 
         public async Task<IEnumerable<CartItem>> FindManyAsync(Expression<Func<CartItem, bool>> filter)

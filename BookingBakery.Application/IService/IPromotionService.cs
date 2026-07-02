@@ -21,10 +21,10 @@ namespace BookingBakery.Application.IService
 
         /// <summary>Thêm sản phẩm vào chương trình khuyến mãi.</summary>
         Task<(bool Success, string Message)> AddProductsAsync(
-            int promotionId, UpdatePromotionProductsRequest request);
+            int promotionId, AddPromotionProductRequest request);
 
         /// <summary>Gỡ sản phẩm khỏi chương trình khuyến mãi.</summary>
         Task<(bool Success, string Message)> RemoveProductsAsync(
-            int promotionId, UpdatePromotionProductsRequest request);
+            int promotionId, RemovePromotionProductRequest request);
     }
 }
