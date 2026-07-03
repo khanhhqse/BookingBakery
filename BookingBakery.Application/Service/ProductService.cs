@@ -63,9 +63,7 @@ namespace BookingBakery.Application.Service
             if (dto.Image == null || dto.Image.Length == 0)
                 throw new ArgumentException("Hình ảnh sản phẩm là bắt buộc.");
 
-            // Validate size đầu tiên
-            if (string.IsNullOrWhiteSpace(dto.SizeName))
-                throw new InvalidOperationException("Vui lòng nhập tên size.");
+            // Không bắt buộc size — có thể thêm sau qua POST /api/Products/{id}/sizes
 
             var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == dto.CategoryId);
             if (category == null)
@@ -96,14 +94,16 @@ namespace BookingBakery.Application.Service
                 StockQuantity = dto.StockQuantity,
                 ImageUrl = uploadResult.SecureUrl.ToString(),
                 Status = "stock",
-                Sizes = new List<ProductSize>
-                {
-                    new ProductSize
+                Sizes = string.IsNullOrWhiteSpace(dto.SizeName)
+                    ? new List<ProductSize>()
+                    : new List<ProductSize>
                     {
-                        Name  = dto.SizeName.Trim(),
-                        Price = dto.Price        // dùng Price làm giá cho size đầu tiên
-                    }
-                },
+                        new ProductSize
+                        {
+                            Name  = dto.SizeName.Trim(),
+                            Price = dto.Price
+                        }
+                    },
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

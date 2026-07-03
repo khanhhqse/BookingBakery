@@ -70,12 +70,11 @@ namespace BookingBakery.Application.DTO
         public IFormFile Image { get; set; } = null!;
 
         /// <summary>
-        /// Size đầu tiên khi tạo sản phẩm (S, M, L...).
-        /// Thêm size với giá sau bằng POST /api/Products/{id}/sizes.
+        /// Size đầu tiên khi tạo sản phẩm (S, M, L...). Optional.
+        /// Để trống nếu muốn thêm size sau qua POST /api/Products/{id}/sizes.
         /// </summary>
-        [Required(ErrorMessage = "Vui lòng nhập tên size đầu tiên.")]
         [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên size phải từ 1 đến 20 ký tự.")]
-        public string SizeName { get; set; } = string.Empty;
+        public string? SizeName { get; set; }
     }
 
     public class UpdateProductStockDto
