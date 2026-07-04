@@ -20,11 +20,7 @@ namespace BookingBakery.Application.IService
         Task<ProductDto?> UpdateImageAsync(int id, Stream imageStream, string fileName);
         Task<ProductDto?> UpdateImageByNameAsync(string name, Stream imageStream, string fileName);
         Task<ProductDto?> UpdateNameAndCategoryAsync(int id, UpdateProductNameAndCategoryDto dto);
-
-        /// <summary>Thêm 1 size mới vào sản phẩm.</summary>
         Task<ProductDto?> AddSizeAsync(int id, ProductSizeRequest request);
-
-        /// <summary>Thay thế toàn bộ danh sách size của sản phẩm.</summary>
         Task<ProductDto?> UpdateSizesAsync(int id, UpdateProductSizesDto dto);
     }
 }

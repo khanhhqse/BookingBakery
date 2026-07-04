@@ -36,15 +36,10 @@ namespace BookingBakery.Application.DTO
         public decimal DiscountValue { get; set; }
 
         [Required(ErrorMessage = "Vui lòng chọn ngày bắt đầu.")]
-        public DateTime StartDate { get; set; }
+        public DateOnly StartDate { get; set; }
 
         [Required(ErrorMessage = "Vui lòng chọn ngày kết thúc.")]
-        public DateTime EndDate { get; set; }
-
-        /// <summary>
-        /// Danh sách product_id muốn gắn ngay lúc tạo — để trống nếu muốn gắn sau.
-        /// </summary>
-        public List<int>? ProductIds { get; set; }
+        public DateOnly EndDate { get; set; }
     }
 
     public class UpdatePromotionRequest
@@ -64,8 +59,8 @@ namespace BookingBakery.Application.DTO
         [Range(0.01, double.MaxValue, ErrorMessage = "Giá trị giảm phải lớn hơn 0.")]
         public decimal? DiscountValue { get; set; }
 
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        public DateOnly? StartDate { get; set; }
+        public DateOnly? EndDate { get; set; }
     }
 
     /// <summary>Gắn thêm sản phẩm vào chương trình khuyến mãi.</summary>
@@ -96,19 +91,10 @@ namespace BookingBakery.Application.DTO
     {
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
+        public string SizeName { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
-        /// <summary>Danh sách size với giá gốc và giá sale tương ứng.</summary>
-        public List<PromotionSizeItem> Sizes { get; set; } = new();
-        /// <summary>Các size được áp promotion. Empty = tất cả size.</summary>
-        public List<string> ApplicableSizes { get; set; } = new();
-    }
-
-    public class PromotionSizeItem
-    {
-        public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public decimal SalePrice { get; set; }
-        public bool HasPromotion { get; set; }
     }
 
     public class PromotionResponse

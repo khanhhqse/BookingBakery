@@ -17,59 +17,16 @@ namespace BookingBakery.Application.Service
             _promotionRepo = promotionRepo;
         }
 
-        public async Task<Dictionary<string, (decimal SalePrice, bool HasPromotion)>> GetSalePricesAsync(
-            int productId, List<(string Name, decimal Price)> sizes)
-        {
-            var result = sizes.ToDictionary(
-                s => s.Name,
-                s => (SalePrice: s.Price, HasPromotion: false));
-
-            var links = await _productPromotionRepo.GetByProductIdAsync(productId);
-            if (links.Count == 0) return result;
-
-            var now = DateTime.UtcNow;
-
-            foreach (var link in links)
-            {
-                var promotion = await _promotionRepo.GetByIdAsync(link.PromotionId);
-                if (promotion == null) continue;
-
-                var isOngoing = promotion.Status == PromotionStatus.Active
-                             && promotion.StartDate <= now
-                             && promotion.EndDate >= now;
-                if (!isOngoing) continue;
-
-                // Xác định size nào được áp — empty = tất cả
-                var targetSizes = link.ApplicableSizes == null || link.ApplicableSizes.Count == 0
-                    ? sizes.Select(s => s.Name).ToList()
-                    : link.ApplicableSizes;
-
-                foreach (var sizeName in targetSizes)
-                {
-                    var sizeInfo = sizes.FirstOrDefault(s =>
-                        s.Name.Equals(sizeName, StringComparison.OrdinalIgnoreCase));
-
-                    if (sizeInfo.Name == null) continue;
-
-                    var salePrice = CalculateSalePrice(sizeInfo.Price, promotion);
-
-                    // Chọn giá thấp nhất nếu nhiều promotion active
-                    if (!result.ContainsKey(sizeInfo.Name) || salePrice < result[sizeInfo.Name].SalePrice)
-                        result[sizeInfo.Name] = (salePrice, true);
-                }
-            }
-
-            return result;
-        }
-
-        public async Task<(decimal SalePrice, bool HasPromotion)> GetSalePriceForSizeAsync(
-            int productId, string sizeName, decimal originalPrice)
+        public async Task<(decimal SalePrice, bool HasPromotion, string? PromotionTitle)> GetSalePriceAsync(
+            int productId, decimal originalPrice)
         {
             var links = await _productPromotionRepo.GetByProductIdAsync(productId);
-            if (links.Count == 0) return (originalPrice, false);
+            if (links.Count == 0)
+                return (originalPrice, false, null);
 
             var now = DateTime.UtcNow;
             decimal? bestSalePrice = null;
+            string? bestTitle = null;
 
             foreach (var link in links)
             {
@@ -81,22 +38,18 @@ namespace BookingBakery.Application.Service
                              && promotion.EndDate >= now;
                 if (!isOngoing) continue;
 
-                // Kiểm tra size có được áp không
-                var appliesToSize = link.ApplicableSizes == null
-                                 || link.ApplicableSizes.Count == 0
-                                 || link.ApplicableSizes.Any(s =>
-                                        s.Equals(sizeName, StringComparison.OrdinalIgnoreCase));
-
-                if (!appliesToSize) continue;
-
                 var salePrice = CalculateSalePrice(originalPrice, promotion);
+
                 if (bestSalePrice == null || salePrice < bestSalePrice)
+                {
                     bestSalePrice = salePrice;
+                    bestTitle = promotion.Title;
+                }
             }
 
             return bestSalePrice.HasValue
-                ? (bestSalePrice.Value, true)
-                : (originalPrice, false);
+                ? (bestSalePrice.Value, true, bestTitle)
+                : (originalPrice, false, null);
         }
 
         public static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)

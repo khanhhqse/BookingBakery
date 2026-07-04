@@ -21,7 +21,6 @@ namespace BookingBakery.Controllers
             _cartService = cartService;
         }
 
-        /// <summary>Xem giỏ hàng của bản thân</summary>
         [HttpGet("me")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Xem giỏ hàng của bản thân")]
@@ -29,35 +28,24 @@ namespace BookingBakery.Controllers
         public async Task<IActionResult> GetMyCart()
         {
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
-            try
-            {
-                var cart = await _cartService.GetCartByUserIdAsync(userId.Value);
-                return Ok(cart);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var cart = await _cartService.GetCartByUserIdAsync(userId.Value);
+            return Ok(cart);
         }
 
-        /// <summary>Thêm sản phẩm vào giỏ hàng</summary>
         [HttpPost("items")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Thêm sản phẩm vào giỏ hàng")]
-        [EndpointDescription("Bắt buộc chọn size. Cùng sản phẩm nhưng khác size = 2 dòng riêng biệt trong giỏ.")]
+        [EndpointDescription("Mỗi ProductId đã là 1 size riêng biệt — không cần chọn size thêm.")]
         [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AddToCart([FromBody] AddToCartDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
             try
             {
@@ -70,31 +58,23 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>Cập nhật số lượng sản phẩm trong giỏ</summary>
         [HttpPut("items/{productId:int}")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Cập nhật số lượng sản phẩm trong giỏ")]
-        [EndpointDescription("Cần truyền thêm sizeName vì cùng productId có thể có nhiều size khác nhau trong giỏ.")]
         [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdateItemQuantity(
             [FromRoute] int productId,
-            [FromQuery] string sizeName,
             [FromBody] UpdateCartItemQuantityDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            if (string.IsNullOrWhiteSpace(sizeName))
-                return BadRequest(new { message = "Vui lòng cung cấp tên size." });
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
             try
             {
-                var cart = await _cartService.UpdateCartItemQuantityAsync(userId.Value, productId, sizeName, dto);
+                var cart = await _cartService.UpdateCartItemQuantityAsync(userId.Value, productId, dto);
                 return Ok(cart);
             }
             catch (InvalidOperationException ex)
@@ -103,47 +83,29 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>Xóa 1 sản phẩm (theo productId + size) khỏi giỏ hàng</summary>
         [HttpDelete("items/{productId:int}")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Xóa 1 sản phẩm khỏi giỏ hàng")]
-        [EndpointDescription("Cần truyền sizeName để xác định đúng item cần xóa.")]
         [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> RemoveItem(
-            [FromRoute] int productId,
-            [FromQuery] string sizeName)
+        public async Task<IActionResult> RemoveItem([FromRoute] int productId)
         {
-            if (string.IsNullOrWhiteSpace(sizeName))
-                return BadRequest(new { message = "Vui lòng cung cấp tên size." });
-
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
-            try
-            {
-                var cart = await _cartService.RemoveCartItemAsync(userId.Value, productId, sizeName);
-                return Ok(cart);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var cart = await _cartService.RemoveCartItemAsync(userId.Value, productId);
+            return Ok(cart);
         }
 
-        /// <summary>Xóa nhiều sản phẩm khỏi giỏ hàng</summary>
         [HttpDelete("items")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Xóa nhiều sản phẩm khỏi giỏ hàng")]
-        [EndpointDescription("Truyền danh sách productId vào body. Sẽ xóa tất cả size của các productId đó.")]
+        [EndpointDescription("Truyền danh sách productId vào body. Ví dụ: [1, 2, 3]")]
         [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RemoveItems([FromBody] List<int> productIds)
         {
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
             try
             {
@@ -156,7 +118,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>Xóa toàn bộ giỏ hàng</summary>
         [HttpDelete("me")]
         [Authorize(Roles = "3")]
         [EndpointSummary("Xóa toàn bộ giỏ hàng")]
@@ -164,16 +125,11 @@ namespace BookingBakery.Controllers
         public async Task<IActionResult> ClearCart()
         {
             var userId = GetCurrentUserId();
-            if (userId == null)
-                return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
+            if (userId == null) return Unauthorized();
 
             var cart = await _cartService.ClearCartAsync(userId.Value);
             return Ok(cart);
         }
-
-        // ──────────────────────────────────────────────────────────────
-        // PRIVATE HELPERS
-        // ──────────────────────────────────────────────────────────────
 
         private int? GetCurrentUserId()
         {

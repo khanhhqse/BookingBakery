@@ -3,17 +3,6 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BookingBakery.Domain.Models
 {
-    /// <summary>Size embedded vào Product — mỗi size có giá riêng.</summary>
-    public class ProductSize
-    {
-        [BsonElement("name")]
-        public string Name { get; set; } = string.Empty;
-
-        [BsonElement("price")]
-        [BsonRepresentation(BsonType.Decimal128)]
-        public decimal Price { get; set; }
-    }
-
     [BsonIgnoreExtraElements]
     public class Product
     {
@@ -30,17 +19,17 @@ namespace BookingBakery.Domain.Models
         [BsonElement("name")]
         public string Name { get; set; } = string.Empty;
 
+        /// <summary>Size của sản phẩm này. Mỗi ProductId = 1 size riêng biệt.</summary>
+        [BsonElement("size_name")]
+        public string SizeName { get; set; } = string.Empty;
+
         [BsonElement("description")]
         public string? Description { get; set; }
 
-        /// <summary>Hướng dẫn bảo quản sản phẩm.</summary>
+        /// <summary>Hướng dẫn bảo quản.</summary>
         [BsonElement("storage_instructions")]
         public string? StorageInstructions { get; set; }
 
-        /// <summary>
-        /// Giá gốc của product — dùng làm fallback nếu cần.
-        /// Giá thực tế lấy từ Size được chọn.
-        /// </summary>
         [BsonElement("price")]
         [BsonRepresentation(BsonType.Decimal128)]
         public decimal Price { get; set; }
@@ -58,13 +47,6 @@ namespace BookingBakery.Domain.Models
         /// <summary>"stock" | "sold_out".</summary>
         [BsonElement("status")]
         public string Status { get; set; } = "stock";
-
-        /// <summary>
-        /// Danh sách size với giá riêng. Bắt buộc ít nhất 1 size.
-        /// VD: [{ name: "S", price: 20000 }, { name: "M", price: 25000 }]
-        /// </summary>
-        [BsonElement("sizes")]
-        public List<ProductSize> Sizes { get; set; } = new();
 
         [BsonElement("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

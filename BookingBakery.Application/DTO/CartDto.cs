@@ -6,22 +6,12 @@ namespace BookingBakery.Application.DTO
     {
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
-        public string? ImageUrl { get; set; }
-
-        /// <summary>Giá gốc của size đã chọn.</summary>
-        public decimal Price { get; set; }
-
-        /// <summary>Giá sau khuyến mãi (nếu có). Bằng Price nếu không có promotion.</summary>
-        public decimal SalePrice { get; set; }
-
-        public bool HasActivePromotion { get; set; }
-
-        /// <summary>Size đã chọn.</summary>
         public string SizeName { get; set; } = string.Empty;
-
+        public string? ImageUrl { get; set; }
+        public decimal Price { get; set; }
+        public decimal SalePrice { get; set; }
+        public bool HasActivePromotion { get; set; }
         public int Quantity { get; set; }
-
-        /// <summary>Tính theo SalePrice — số tiền thực tế phải trả.</summary>
         public decimal Subtotal => SalePrice * Quantity;
     }
 
@@ -42,10 +32,6 @@ namespace BookingBakery.Application.DTO
     {
         [Required(ErrorMessage = "Product ID là bắt buộc.")]
         public int ProductId { get; set; }
-
-        [Required(ErrorMessage = "Vui lòng chọn size.")]
-        [StringLength(20, MinimumLength = 1, ErrorMessage = "Tên size không hợp lệ.")]
-        public string SizeName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Số lượng là bắt buộc.")]
         [Range(1, 50, ErrorMessage = "Số lượng phải từ 1 đến 50.")]

@@ -39,60 +39,40 @@ namespace BookingBakery.Application.Service
                 throw new InvalidOperationException($"Sản phẩm #{dto.ProductId} không tồn tại.");
 
             if (product.Status == "sold_out")
-                throw new InvalidOperationException($"Rất tiếc, sản phẩm \"{product.Name}\" đã hết hàng.");
-
-            if (product.Sizes == null || product.Sizes.Count == 0)
-                throw new InvalidOperationException($"Sản phẩm \"{product.Name}\" chưa có size. Vui lòng liên hệ nhân viên.");
-
-            var selectedSize = product.Sizes.FirstOrDefault(
-                s => s.Name.Equals(dto.SizeName.Trim(), StringComparison.OrdinalIgnoreCase));
-
-            if (selectedSize == null)
                 throw new InvalidOperationException(
-                    $"Size \"{dto.SizeName}\" không tồn tại cho sản phẩm \"{product.Name}\". " +
-                    $"Các size hợp lệ: {string.Join(", ", product.Sizes.Select(s => s.Name))}.");
+                    $"Rất tiếc, sản phẩm \"{product.Name}\" size {product.SizeName} đã hết hàng.");
 
-            // Tính sale price theo size
-            var (salePrice, _) = await _promotionPriceHelper.GetSalePriceForSizeAsync(
-                product.ProductId, selectedSize.Name, selectedSize.Price);
+            var (salePrice, _, _) = await _promotionPriceHelper.GetSalePriceAsync(
+                product.ProductId, product.Price);
 
             var existingItem = await _cartItemRepository.FindOneAsync(
-                ci => ci.CartId == cart.CartId
-                   && ci.ProductId == dto.ProductId
-                   && ci.SizeName == selectedSize.Name);
+                ci => ci.CartId == cart.CartId && ci.ProductId == dto.ProductId);
 
             if (existingItem != null)
             {
                 var newQty = existingItem.Quantity + dto.Quantity;
-
                 if (newQty > 50)
                     throw new InvalidOperationException(
-                        $"Số lượng \"{product.Name}\" ({selectedSize.Name}) trong giỏ không được vượt quá 50.");
-
+                        $"Số lượng \"{product.Name}\" ({product.SizeName}) trong giỏ không được vượt quá 50.");
                 if (newQty > product.StockQuantity)
                     throw new InvalidOperationException(
-                        $"Rất tiếc, \"{product.Name}\" ({selectedSize.Name}) không đủ hàng để thêm.");
+                        $"Rất tiếc, \"{product.Name}\" ({product.SizeName}) không đủ hàng để thêm.");
 
                 existingItem.Quantity = newQty;
-                existingItem.SizePrice = salePrice;
                 await _cartItemRepository.UpdateAsync(
-                    ci => ci.CartId == cart.CartId
-                       && ci.ProductId == dto.ProductId
-                       && ci.SizeName == selectedSize.Name,
+                    ci => ci.CartId == cart.CartId && ci.ProductId == dto.ProductId,
                     existingItem);
             }
             else
             {
                 if (dto.Quantity > product.StockQuantity)
                     throw new InvalidOperationException(
-                        $"Rất tiếc, \"{product.Name}\" ({selectedSize.Name}) không đủ hàng.");
+                        $"Rất tiếc, \"{product.Name}\" ({product.SizeName}) không đủ hàng.");
 
                 await _cartItemRepository.CreateAsync(new CartItem
                 {
                     CartId = cart.CartId,
                     ProductId = dto.ProductId,
-                    SizeName = selectedSize.Name,
-                    SizePrice = salePrice,
                     Quantity = dto.Quantity
                 });
             }
@@ -102,18 +82,16 @@ namespace BookingBakery.Application.Service
         }
 
         public async Task<CartDto> UpdateCartItemQuantityAsync(
-            int userId, int productId, string sizeName, UpdateCartItemQuantityDto dto)
+            int userId, int productId, UpdateCartItemQuantityDto dto)
         {
             var cart = await GetOrCreateCartAsync(userId);
 
             var item = await _cartItemRepository.FindOneAsync(
-                ci => ci.CartId == cart.CartId
-                   && ci.ProductId == productId
-                   && ci.SizeName == sizeName.Trim());
+                ci => ci.CartId == cart.CartId && ci.ProductId == productId);
 
             if (item == null)
                 throw new InvalidOperationException(
-                    $"Không tìm thấy sản phẩm #{productId} size \"{sizeName}\" trong giỏ hàng.");
+                    $"Không tìm thấy sản phẩm #{productId} trong giỏ hàng.");
 
             var product = await _productRepository.GetByIdAsync(productId);
             if (product != null && dto.Quantity > product.StockQuantity)
@@ -121,24 +99,17 @@ namespace BookingBakery.Application.Service
 
             item.Quantity = dto.Quantity;
             await _cartItemRepository.UpdateAsync(
-                ci => ci.CartId == cart.CartId
-                   && ci.ProductId == productId
-                   && ci.SizeName == sizeName.Trim(),
-                item);
+                ci => ci.CartId == cart.CartId && ci.ProductId == productId, item);
 
             await TouchCartAsync(cart);
             return await BuildCartDtoAsync(cart);
         }
 
-        public async Task<CartDto> RemoveCartItemAsync(int userId, int productId, string sizeName)
+        public async Task<CartDto> RemoveCartItemAsync(int userId, int productId)
         {
             var cart = await GetOrCreateCartAsync(userId);
-
             await _cartItemRepository.DeleteAsync(
-                ci => ci.CartId == cart.CartId
-                   && ci.ProductId == productId
-                   && ci.SizeName == sizeName.Trim());
-
+                ci => ci.CartId == cart.CartId && ci.ProductId == productId);
             await TouchCartAsync(cart);
             return await BuildCartDtoAsync(cart);
         }
@@ -149,10 +120,8 @@ namespace BookingBakery.Application.Service
                 throw new InvalidOperationException("Vui lòng chọn ít nhất một sản phẩm để xóa.");
 
             var cart = await GetOrCreateCartAsync(userId);
-
             await _cartItemRepository.DeleteManyAsync(
                 ci => ci.CartId == cart.CartId && productIds.Contains(ci.ProductId));
-
             await TouchCartAsync(cart);
             return await BuildCartDtoAsync(cart);
         }
@@ -184,7 +153,6 @@ namespace BookingBakery.Application.Service
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-
             await _cartRepository.CreateAsync(cart);
             return cart;
         }
@@ -211,61 +179,37 @@ namespace BookingBakery.Application.Service
                 if (product == null || product.Status == "sold_out")
                 {
                     await _cartItemRepository.DeleteAsync(
-                        ci => ci.CartId == cart.CartId
-                           && ci.ProductId == item.ProductId
-                           && ci.SizeName == item.SizeName);
-
+                        ci => ci.CartId == cart.CartId && ci.ProductId == item.ProductId);
                     removedItemNotices.Add(
                         product == null
-                            ? $"Sản phẩm #{item.ProductId} ({item.SizeName}) không còn kinh doanh và đã được xóa khỏi giỏ hàng."
-                            : $"\"{product.Name}\" ({item.SizeName}) đã hết hàng và được xóa khỏi giỏ hàng.");
-                    continue;
-                }
-
-                var currentSize = product.Sizes.FirstOrDefault(
-                    s => s.Name.Equals(item.SizeName, StringComparison.OrdinalIgnoreCase));
-
-                if (currentSize == null)
-                {
-                    await _cartItemRepository.DeleteAsync(
-                        ci => ci.CartId == cart.CartId
-                           && ci.ProductId == item.ProductId
-                           && ci.SizeName == item.SizeName);
-
-                    removedItemNotices.Add(
-                        $"\"{product.Name}\" size \"{item.SizeName}\" không còn được cung cấp và đã được xóa khỏi giỏ hàng.");
+                            ? $"Sản phẩm #{item.ProductId} không còn kinh doanh và đã được xóa khỏi giỏ hàng."
+                            : $"\"{product.Name}\" ({product.SizeName}) đã hết hàng và được xóa khỏi giỏ hàng.");
                     continue;
                 }
 
                 var quantity = item.Quantity;
-
                 if (quantity > product.StockQuantity)
                 {
                     quantity = product.StockQuantity;
                     item.Quantity = quantity;
                     await _cartItemRepository.UpdateAsync(
-                        ci => ci.CartId == cart.CartId
-                           && ci.ProductId == item.ProductId
-                           && ci.SizeName == item.SizeName,
-                        item);
-
+                        ci => ci.CartId == cart.CartId && ci.ProductId == item.ProductId, item);
                     adjustedItemNotices.Add(
-                        $"\"{product.Name}\" ({item.SizeName}) đã được điều chỉnh xuống còn {quantity} do tồn kho không đủ.");
+                        $"\"{product.Name}\" ({product.SizeName}) đã được điều chỉnh xuống còn {quantity} do tồn kho không đủ.");
                 }
 
-                // Tính giá sale theo size cụ thể
-                var (salePrice, hasPromotion) = await _promotionPriceHelper.GetSalePriceForSizeAsync(
-                    product.ProductId, currentSize.Name, currentSize.Price);
+                var (salePrice, hasPromotion, _) = await _promotionPriceHelper.GetSalePriceAsync(
+                    product.ProductId, product.Price);
 
                 itemDtos.Add(new CartItemDto
                 {
                     ProductId = product.ProductId,
                     ProductName = product.Name,
+                    SizeName = product.SizeName,
                     ImageUrl = product.ImageUrl,
-                    Price = currentSize.Price,
+                    Price = product.Price,
                     SalePrice = salePrice,
                     HasActivePromotion = hasPromotion,
-                    SizeName = item.SizeName,
                     Quantity = quantity
                 });
             }

@@ -36,6 +36,9 @@ namespace BookingBakery.Application.Service
             if (request.EndDate <= request.StartDate)
                 return (false, "Ngày kết thúc phải sau ngày bắt đầu.", null);
 
+            if (request.EndDate < DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)))
+                return (false, "Ngày kết thúc phải ở tương lai.", null);
+
             if (request.BannerImage == null || request.BannerImage.Length == 0)
                 return (false, "Vui lòng tải lên hình ảnh banner.", null);
 
@@ -44,24 +47,6 @@ namespace BookingBakery.Application.Service
             if (!allowedExtensions.Contains(extension))
                 return (false,
                     "Định dạng file không hợp lệ. Chỉ chấp nhận: .jpg, .jpeg, .png, .gif, .webp", null);
-
-            // Validate các product_id được gắn (nếu có)
-            var validProductIds = new List<int>();
-            var invalidProductIds = new List<int>();
-
-            foreach (var productId in (request.ProductIds ?? new List<int>()).Distinct())
-            {
-                var product = await _productRepo.GetByIdAsync(productId);
-                if (product == null)
-                    invalidProductIds.Add(productId);
-                else
-                    validProductIds.Add(productId);
-            }
-
-            if (invalidProductIds.Count > 0)
-                return (false,
-                    $"Một số sản phẩm không tồn tại: {string.Join(", ", invalidProductIds.Select(id => $"#{id}"))}. " +
-                    "Vui lòng kiểm tra lại danh sách sản phẩm.", null);
 
             // Upload banner lên Cloudinary
             string bannerUrl;
@@ -90,11 +75,24 @@ namespace BookingBakery.Application.Service
                 ? PromotionDiscountType.Percent
                 : PromotionDiscountType.Fixed;
 
-            if (discountType == PromotionDiscountType.Percent &&
-                (request.DiscountValue <= 0 || request.DiscountValue > 100))
-                return (false, "Giá trị giảm theo % phải trong khoảng 1-100.", null);
+            // Validate discount
+            if (discountType == PromotionDiscountType.Percent)
+            {
+                if (request.DiscountValue <= 0 || request.DiscountValue > 100)
+                    return (false, "Giá trị giảm theo % phải trong khoảng 1-100.", null);
+            }
+            else // Fixed
+            {
+                if (request.DiscountValue <= 0)
+                    return (false, "Số tiền giảm phải lớn hơn 0.", null);
+
+                // Validate với các sản phẩm được gắn (nếu có) — kiểm tra sau khi gắn sp
+            }
 
             var now = DateTime.UtcNow;
+            // DateOnly → DateTime UTC: bắt đầu 00:00 VN (UTC-7 = UTC+7-14h)
+            var startDateTime = request.StartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-7);
+            var endDateTime = request.EndDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc).AddHours(-7);
 
             var promotion = new Promotion
             {
@@ -104,24 +102,14 @@ namespace BookingBakery.Application.Service
                 BannerUrl = bannerUrl,
                 DiscountType = discountType,
                 DiscountValue = request.DiscountValue,
-                StartDate = request.StartDate,
-                EndDate = request.EndDate,
+                StartDate = startDateTime,
+                EndDate = endDateTime,
                 Status = PromotionStatus.Active,
                 CreatedAt = now,
                 UpdatedAt = now
             };
 
             await _promotionRepo.CreateAsync(promotion);
-
-            foreach (var productId in validProductIds)
-            {
-                await _productPromotionRepo.CreateAsync(new ProductPromotion
-                {
-                    PromotionId = promotionId,
-                    ProductId = productId,
-                    CreatedAt = now
-                });
-            }
 
             var response = await BuildFullResponseAsync(promotion);
             return (true, $"Tạo chương trình khuyến mãi \"{promotion.Title}\" thành công.", response);
@@ -186,10 +174,10 @@ namespace BookingBakery.Application.Service
                 return (false, "Giá trị giảm theo % phải trong khoảng 1-100.", null);
 
             if (request.StartDate.HasValue)
-                promotion.StartDate = request.StartDate.Value;
+                promotion.StartDate = request.StartDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-7);
 
             if (request.EndDate.HasValue)
-                promotion.EndDate = request.EndDate.Value;
+                promotion.EndDate = request.EndDate.Value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc).AddHours(-7);
 
             if (promotion.EndDate <= promotion.StartDate)
                 return (false, "Ngày kết thúc phải sau ngày bắt đầu.", null);
@@ -296,13 +284,16 @@ namespace BookingBakery.Application.Service
                     continue;
                 }
 
+                // Validate discount hợp lý với giá sản phẩm (chỉ cần check fixed)
+                if (promotion.DiscountType == PromotionDiscountType.Fixed && promotion.DiscountValue >= product.Price)
+                    return (false,
+                        $"Số tiền giảm ({promotion.DiscountValue:N0}đ) phải nhỏ hơn giá sản phẩm " +
+                        $"\"{product.Name}\" ({product.Price:N0}đ). Vui lòng điều chỉnh.");
+
                 await _productPromotionRepo.CreateAsync(new ProductPromotion
                 {
                     PromotionId = promotionId,
                     ProductId = productId,
-                    ApplicableSizes = request.ApplicableSizes
-                                          .Select(s => s.Trim().ToUpper())
-                                          .ToList(),
                     CreatedAt = DateTime.UtcNow
                 });
                 added.Add(productId);
@@ -351,32 +342,16 @@ namespace BookingBakery.Application.Service
                 var product = await _productRepo.GetByIdAsync(link.ProductId);
                 if (product == null) continue;
 
-                var applicableSizes = link.ApplicableSizes ?? new List<string>();
-                var sizesToApply = applicableSizes.Count == 0
-                    ? product.Sizes.Select(s => s.Name).ToList()
-                    : applicableSizes;
-
-                var sizeItems = product.Sizes.Select(s =>
-                {
-                    var applies = isOngoing && sizesToApply.Any(
-                        n => n.Equals(s.Name, StringComparison.OrdinalIgnoreCase));
-                    var salePrice = applies ? CalculateSalePrice(s.Price, p) : s.Price;
-                    return new PromotionSizeItem
-                    {
-                        Name = s.Name,
-                        Price = s.Price,
-                        SalePrice = salePrice,
-                        HasPromotion = applies
-                    };
-                }).ToList();
+                var salePrice = isOngoing ? CalculateSalePrice(product.Price, p) : product.Price;
 
                 products.Add(new PromotionProductItem
                 {
                     ProductId = product.ProductId,
                     ProductName = product.Name,
+                    SizeName = product.SizeName,
                     ImageUrl = product.ImageUrl,
-                    Sizes = sizeItems,
-                    ApplicableSizes = applicableSizes
+                    Price = product.Price,
+                    SalePrice = salePrice
                 });
             }
 
