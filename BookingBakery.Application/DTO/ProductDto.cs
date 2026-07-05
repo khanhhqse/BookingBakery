@@ -34,7 +34,7 @@ namespace BookingBakery.Application.DTO
         public string Name { get; set; } = string.Empty;
 
         /// <summary>Size của sản phẩm này. VD: S, M, L, XL.</summary>
-        [Required(ErrorMessage = "Vui lòng nhập tên size.")]
+        //[Required(ErrorMessage = "Vui lòng nhập tên size.")]
         [StringLength(20, ErrorMessage = "Tên size không quá 20 ký tự.")]
         public string SizeName { get; set; } = string.Empty;
 

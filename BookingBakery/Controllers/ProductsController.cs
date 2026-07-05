@@ -375,65 +375,8 @@ namespace BookingBakery.Controllers
             }
         }
 
-        // ════════════════════════════════════════════════════════════════
-        // Thêm 3 endpoint này vào ProductsController.cs
-        // ════════════════════════════════════════════════════════════════
 
-        // 1. Thêm 1 size vào sản phẩm
-        [HttpPost("{id:int}/sizes")]
-        [Authorize(Roles = "1")]
-        [EndpointSummary("Thêm 1 size vào sản phẩm")]
-        [EndpointDescription("Chỉ Admin. Gọi nhiều lần để thêm nhiều size. Size name không được trùng.")]
-        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> AddSize(int id, [FromBody] ProductSizeRequest request)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            try
-            {
-                var product = await _productService.AddSizeAsync(id, request);
-                if (product == null)
-                    return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
-
-                return Ok(product);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        // 2. Cập nhật toàn bộ danh sách size (thay thế)
-        [HttpPut("{id:int}/sizes")]
-        [Authorize(Roles = "1")]
-        [EndpointSummary("Cập nhật toàn bộ danh sách size")]
-        [EndpointDescription("Chỉ Admin. Thay thế toàn bộ size hiện tại — bắt buộc ít nhất 1 size.")]
-        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateSizes(int id, [FromBody] UpdateProductSizesDto dto)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            try
-            {
-                var product = await _productService.UpdateSizesAsync(id, dto);
-                if (product == null)
-                    return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
-
-                return Ok(product);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        // 3. Cập nhật hướng dẫn bảo quản
+        // Cập nhật hướng dẫn bảo quản
         [HttpPut("{id:int}/storage-instructions")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật hướng dẫn bảo quản")]

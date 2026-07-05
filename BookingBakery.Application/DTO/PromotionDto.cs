@@ -23,14 +23,12 @@ namespace BookingBakery.Application.DTO
         [StringLength(2000, ErrorMessage = "Nội dung không được vượt quá 2000 ký tự.")]
         public string? Content { get; set; }
 
-        /// <summary>Ảnh banner — bắt buộc khi tạo mới.</summary>
         [Required(ErrorMessage = "Vui lòng tải lên hình ảnh banner.")]
         public IFormFile BannerImage { get; set; } = null!;
 
         [Required(ErrorMessage = "Vui lòng chọn loại giảm giá.")]
         public PromotionDiscountTypeOption DiscountType { get; set; }
 
-        /// <summary>Nếu Percent: 1-100. Nếu Fixed: số tiền > 0.</summary>
         [Required(ErrorMessage = "Vui lòng nhập giá trị giảm.")]
         [Range(0.01, double.MaxValue, ErrorMessage = "Giá trị giảm phải lớn hơn 0.")]
         public decimal DiscountValue { get; set; }
@@ -40,6 +38,13 @@ namespace BookingBakery.Application.DTO
 
         [Required(ErrorMessage = "Vui lòng chọn ngày kết thúc.")]
         public DateOnly EndDate { get; set; }
+
+        /// <summary>
+        /// Tùy chọn: gắn sẵn sản phẩm ngay lúc tạo promotion.
+        /// Mỗi phần tử là ProductId của 1 size cụ thể (vì mỗi size = 1 Product riêng).
+        /// Để trống nếu muốn gắn sau qua endpoint /products.
+        /// </summary>
+        public List<int>? ProductIds { get; set; }
     }
 
     public class UpdatePromotionRequest

@@ -79,7 +79,7 @@ namespace BookingBakery.Application.Service
                 ProductId = nextId,
                 CategoryId = dto.CategoryId,
                 Name = dto.Name,
-                SizeName = dto.SizeName.Trim().ToUpper(),
+                SizeName = string.IsNullOrWhiteSpace(dto.SizeName) ? string.Empty : dto.SizeName.Trim().ToUpper(),
                 Description = dto.Description,
                 StorageInstructions = dto.StorageInstructions?.Trim(),
                 Price = dto.Price,
@@ -286,101 +286,6 @@ namespace BookingBakery.Application.Service
             await _productRepository.UpdateAsync(x => x.ProductId == id, p);
 
             return await MapToDtoAsync(p, category.Name);
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // SIZE MANAGEMENT (mỗi size = 1 dòng Product riêng, dùng chung Name)
-        // ──────────────────────────────────────────────────────────────
-
-        public async Task<ProductDto?> AddSizeAsync(int id, ProductSizeRequest request)
-        {
-            var baseProduct = await _productRepository.FindOneAsync(x => x.ProductId == id);
-            if (baseProduct == null) return null;
-
-            var sizeName = request.SizeName.Trim().ToUpper();
-
-            var allProducts = await _productRepository.GetAllAsync();
-            var duplicated = allProducts.Any(p =>
-                p.Name.Equals(baseProduct.Name, StringComparison.OrdinalIgnoreCase) &&
-                p.SizeName.Equals(sizeName, StringComparison.OrdinalIgnoreCase));
-
-            if (duplicated)
-                throw new InvalidOperationException($"Sản phẩm '{baseProduct.Name}' đã có size '{sizeName}'.");
-
-            var nextId = allProducts.Any() ? allProducts.Max(p => p.ProductId) + 1 : 1;
-
-            var newSize = new Product
-            {
-                ProductId = nextId,
-                CategoryId = baseProduct.CategoryId,
-                Name = baseProduct.Name,
-                SizeName = sizeName,
-                Description = baseProduct.Description,
-                StorageInstructions = baseProduct.StorageInstructions,
-                Price = request.Price,
-                CostPrice = request.CostPrice,
-                StockQuantity = request.StockQuantity,
-                ImageUrl = baseProduct.ImageUrl,
-                Status = request.StockQuantity > 0 ? "stock" : "sold_out",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            await _productRepository.CreateAsync(newSize);
-
-            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == newSize.CategoryId);
-            return await MapToDtoAsync(newSize, category?.Name ?? "Không xác định");
-        }
-
-        public async Task<ProductDto?> UpdateSizesAsync(int id, UpdateProductSizesDto dto)
-        {
-            var baseProduct = await _productRepository.FindOneAsync(x => x.ProductId == id);
-            if (baseProduct == null) return null;
-
-            var requestedSizeNames = dto.Sizes
-                .Select(s => s.SizeName.Trim().ToUpper())
-                .ToList();
-
-            if (requestedSizeNames.Count != requestedSizeNames.Distinct().Count())
-                throw new InvalidOperationException("Danh sách size bị trùng tên, mỗi size phải có tên khác nhau.");
-
-            var allProducts = await _productRepository.GetAllAsync();
-
-            var sameFamily = allProducts
-                .Where(p => p.Name.Equals(baseProduct.Name, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            foreach (var old in sameFamily)
-                await _productRepository.DeleteAsync(x => x.ProductId == old.ProductId);
-
-            var nextId = allProducts.Any() ? allProducts.Max(p => p.ProductId) + 1 : 1;
-
-            Product? firstCreated = null;
-            foreach (var sizeRequest in dto.Sizes)
-            {
-                var newSize = new Product
-                {
-                    ProductId = nextId++,
-                    CategoryId = baseProduct.CategoryId,
-                    Name = baseProduct.Name,
-                    SizeName = sizeRequest.SizeName.Trim().ToUpper(),
-                    Description = baseProduct.Description,
-                    StorageInstructions = baseProduct.StorageInstructions,
-                    Price = sizeRequest.Price,
-                    CostPrice = sizeRequest.CostPrice,
-                    StockQuantity = sizeRequest.StockQuantity,
-                    ImageUrl = baseProduct.ImageUrl,
-                    Status = sizeRequest.StockQuantity > 0 ? "stock" : "sold_out",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
-                await _productRepository.CreateAsync(newSize);
-                firstCreated ??= newSize;
-            }
-
-            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == baseProduct.CategoryId);
-            return await MapToDtoAsync(firstCreated!, category?.Name ?? "Không xác định");
         }
 
         // ──────────────────────────────────────────────────────────────

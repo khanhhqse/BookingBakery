@@ -17,14 +17,6 @@ namespace BookingBakery.Domain.Models
         [BsonElement("product_id")]
         public int ProductId { get; set; }
 
-        /// <summary>
-        /// Danh sách tên size được áp promotion này.
-        /// Null hoặc empty = áp dụng cho TẤT CẢ size của sản phẩm.
-        /// VD: ["L", "XL"] = chỉ giảm size L và XL.
-        /// </summary>
-        [BsonElement("applicable_sizes")]
-        public List<string> ApplicableSizes { get; set; } = new();
-
         [BsonElement("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

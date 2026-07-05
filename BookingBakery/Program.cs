@@ -45,7 +45,7 @@ namespace BookingBakery
             builder.Services.AddScoped<IProductIngredientService, ProductIngredientService>();
 
 
-            
+
             builder.Services.AddScoped<ICartRepository, CartRepository>();
             builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
 
@@ -103,7 +103,15 @@ namespace BookingBakery
             });
 
             builder.Services.AddAuthorization();
-            builder.Services.AddControllers();
+
+            // ─── Tắt implicit-required cho non-nullable reference type ────
+            // Mặc định ASP.NET Core tự coi mọi property "string" (không có
+            // dấu ?) là required, kể cả khi DTO không có [Required] nào.
+            // Đây là lý do SizeName (string?) vẫn báo "field is required".
+            builder.Services.AddControllers(options =>
+            {
+                options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+            });
 
             // ─── Swagger ─────────────────────────────────────────────────
             builder.Services.AddEndpointsApiExplorer();

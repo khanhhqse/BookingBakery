@@ -48,7 +48,6 @@ namespace BookingBakery.Application.Service
                 return (false,
                     "Định dạng file không hợp lệ. Chỉ chấp nhận: .jpg, .jpeg, .png, .gif, .webp", null);
 
-            // Upload banner lên Cloudinary
             string bannerUrl;
             try
             {
@@ -75,22 +74,18 @@ namespace BookingBakery.Application.Service
                 ? PromotionDiscountType.Percent
                 : PromotionDiscountType.Fixed;
 
-            // Validate discount
             if (discountType == PromotionDiscountType.Percent)
             {
                 if (request.DiscountValue <= 0 || request.DiscountValue > 100)
                     return (false, "Giá trị giảm theo % phải trong khoảng 1-100.", null);
             }
-            else // Fixed
+            else
             {
                 if (request.DiscountValue <= 0)
                     return (false, "Số tiền giảm phải lớn hơn 0.", null);
-
-                // Validate với các sản phẩm được gắn (nếu có) — kiểm tra sau khi gắn sp
             }
 
             var now = DateTime.UtcNow;
-            // DateOnly → DateTime UTC: bắt đầu 00:00 VN (UTC-7 = UTC+7-14h)
             var startDateTime = request.StartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-7);
             var endDateTime = request.EndDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc).AddHours(-7);
 
@@ -111,8 +106,28 @@ namespace BookingBakery.Application.Service
 
             await _promotionRepo.CreateAsync(promotion);
 
+            // Gắn sản phẩm ngay lúc tạo (nếu có truyền ProductIds)
+            string? productWarning = null;
+            if (request.ProductIds != null && request.ProductIds.Count > 0)
+            {
+                var (_, _, invalidProducts, error) = await AddProductsInternalAsync(promotion, request.ProductIds);
+
+                if (error != null)
+                {
+                    // Rollback promotion vừa tạo vì gắn sản phẩm thất bại (VD: giảm giá cố định >= giá sp)
+                    await _promotionRepo.DeleteAsync(promotion.PromotionId);
+                    return (false, error, null);
+                }
+
+                if (invalidProducts.Count > 0)
+                    productWarning =
+                        $" Một số sản phẩm không tồn tại nên chưa được gắn: {string.Join(", ", invalidProducts.Select(id => $"#{id}"))}.";
+            }
+
             var response = await BuildFullResponseAsync(promotion);
-            return (true, $"Tạo chương trình khuyến mãi \"{promotion.Title}\" thành công.", response);
+            return (true,
+                $"Tạo chương trình khuyến mãi \"{promotion.Title}\" thành công.{productWarning}",
+                response);
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -131,7 +146,6 @@ namespace BookingBakery.Application.Service
             if (request.Content != null)
                 promotion.Content = request.Content.Trim();
 
-            // Upload banner mới nếu có truyền lên
             if (request.BannerImage != null && request.BannerImage.Length > 0)
             {
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
@@ -264,40 +278,11 @@ namespace BookingBakery.Application.Service
             if (promotion == null)
                 return (false, "Không tìm thấy chương trình khuyến mãi.");
 
-            var added = new List<int>();
-            var alreadyExists = new List<int>();
-            var invalidProducts = new List<int>();
+            var (added, alreadyExists, invalidProducts, error) =
+                await AddProductsInternalAsync(promotion, request.ProductIds);
 
-            foreach (var productId in request.ProductIds.Distinct())
-            {
-                var product = await _productRepo.GetByIdAsync(productId);
-                if (product == null)
-                {
-                    invalidProducts.Add(productId);
-                    continue;
-                }
-
-                var exists = await _productPromotionRepo.ExistsAsync(promotionId, productId);
-                if (exists)
-                {
-                    alreadyExists.Add(productId);
-                    continue;
-                }
-
-                // Validate discount hợp lý với giá sản phẩm (chỉ cần check fixed)
-                if (promotion.DiscountType == PromotionDiscountType.Fixed && promotion.DiscountValue >= product.Price)
-                    return (false,
-                        $"Số tiền giảm ({promotion.DiscountValue:N0}đ) phải nhỏ hơn giá sản phẩm " +
-                        $"\"{product.Name}\" ({product.Price:N0}đ). Vui lòng điều chỉnh.");
-
-                await _productPromotionRepo.CreateAsync(new ProductPromotion
-                {
-                    PromotionId = promotionId,
-                    ProductId = productId,
-                    CreatedAt = DateTime.UtcNow
-                });
-                added.Add(productId);
-            }
+            if (error != null)
+                return (false, error);
 
             if (invalidProducts.Count > 0)
                 return (false,
@@ -329,6 +314,51 @@ namespace BookingBakery.Application.Service
         // ──────────────────────────────────────────────────────────────
         // PRIVATE HELPERS
         // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Logic gắn sản phẩm dùng chung cho CreatePromotionAsync và AddProductsAsync.
+        /// Trả về (Added, AlreadyExists, Invalid, Error). Error != null nghĩa là gặp lỗi
+        /// nghiệp vụ nghiêm trọng (VD: giảm cố định >= giá sp) cần dừng lại ngay.
+        /// </summary>
+        private async Task<(List<int> Added, List<int> AlreadyExists, List<int> Invalid, string? Error)>
+            AddProductsInternalAsync(Promotion promotion, IEnumerable<int> productIds)
+        {
+            var added = new List<int>();
+            var alreadyExists = new List<int>();
+            var invalidProducts = new List<int>();
+
+            foreach (var productId in productIds.Distinct())
+            {
+                var product = await _productRepo.GetByIdAsync(productId);
+                if (product == null)
+                {
+                    invalidProducts.Add(productId);
+                    continue;
+                }
+
+                var exists = await _productPromotionRepo.ExistsAsync(promotion.PromotionId, productId);
+                if (exists)
+                {
+                    alreadyExists.Add(productId);
+                    continue;
+                }
+
+                if (promotion.DiscountType == PromotionDiscountType.Fixed && promotion.DiscountValue >= product.Price)
+                    return (added, alreadyExists, invalidProducts,
+                        $"Số tiền giảm ({promotion.DiscountValue:N0}đ) phải nhỏ hơn giá sản phẩm " +
+                        $"\"{product.Name}\" ({product.Price:N0}đ). Vui lòng điều chỉnh.");
+
+                await _productPromotionRepo.CreateAsync(new ProductPromotion
+                {
+                    PromotionId = promotion.PromotionId,
+                    ProductId = productId,
+                    CreatedAt = DateTime.UtcNow
+                });
+                added.Add(productId);
+            }
+
+            return (added, alreadyExists, invalidProducts, null);
+        }
 
         private async Task<PromotionResponse> BuildFullResponseAsync(Promotion p)
         {
@@ -393,7 +423,6 @@ namespace BookingBakery.Application.Service
             };
         }
 
-        /// <summary>Tính giá sau giảm — dùng chung qua PromotionPriceHelper.</summary>
         private static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)
             => PromotionPriceHelper.CalculateSalePrice(originalPrice, promotion);
     }
