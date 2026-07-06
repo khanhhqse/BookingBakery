@@ -56,7 +56,6 @@ namespace BookingBakery.Application.DTO
         [StringLength(2000, ErrorMessage = "Nội dung không được vượt quá 2000 ký tự.")]
         public string? Content { get; set; }
 
-        /// <summary>Để trống nếu không muốn đổi ảnh banner.</summary>
         public IFormFile? BannerImage { get; set; }
 
         public PromotionDiscountTypeOption? DiscountType { get; set; }
@@ -71,14 +70,13 @@ namespace BookingBakery.Application.DTO
     /// <summary>Gắn thêm sản phẩm vào chương trình khuyến mãi.</summary>
     public class AddPromotionProductRequest
     {
-        [Required(ErrorMessage = "Vui lòng cung cấp danh sách sản phẩm.")]
-        public List<int> ProductIds { get; set; } = new();
-
         /// <summary>
-        /// Danh sách size được áp promotion. Để trống = áp tất cả size.
-        /// VD: ["L", "XL"] = chỉ giảm size L và XL.
+        /// Mỗi phần tử là ProductId của 1 size cụ thể (VD: bánh Chocolate size L có
+        /// ProductId=15, size M có ProductId=16 — muốn áp cả 2 size thì truyền [15, 16]).
         /// </summary>
-        public List<string> ApplicableSizes { get; set; } = new();
+        [Required(ErrorMessage = "Vui lòng cung cấp danh sách sản phẩm.")]
+        [MinLength(1, ErrorMessage = "Danh sách sản phẩm không được để trống.")]
+        public List<int> ProductIds { get; set; } = new();
     }
 
     /// <summary>Gỡ sản phẩm khỏi chương trình khuyến mãi.</summary>

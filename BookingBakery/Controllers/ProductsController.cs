@@ -17,9 +17,6 @@ namespace BookingBakery.Controllers
             _productService = productService;
         }
 
-        /// <summary>
-        /// Xem toàn bộ sản phẩm trong kho (Khách vãng lai cũng xem được)
-        /// </summary>
         [HttpGet]
         [AllowAnonymous]
         [EndpointSummary("Xem toàn bộ sản phẩm trong kho")]
@@ -31,9 +28,6 @@ namespace BookingBakery.Controllers
             return Ok(products);
         }
 
-        /// <summary>
-        /// Xem sản phẩm theo ID
-        /// </summary>
         [HttpGet("{id:int}")]
         [AllowAnonymous]
         [EndpointSummary("Xem sản phẩm theo ID")]
@@ -49,17 +43,11 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Thêm sản phẩm mới vào kho (Chỉ Admin)
-        /// </summary>
         [HttpPost]
         [Authorize(Roles = "1")]
         [Consumes("multipart/form-data")]
         [EndpointSummary("Admin thêm sản phẩm mới vào kho")]
-
-        [EndpointDescription("Tạo xong nếu muốn thêm size thì dùng api 'thêm size' để thêm các size các cho sp. Nếu tạo size khác bằng api này thì productId sẽ thay đổi ")]
-
-
+        [EndpointDescription("Nếu tạo cùng Name nhưng khác SizeName, hệ thống sẽ tạo thêm 1 dòng sản phẩm mới với ProductId riêng — đó chính là size mới của sản phẩm này.")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromForm] CreateProductDto dto)
@@ -86,9 +74,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>
-        /// Cập nhật giá sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/price")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật giá sản phẩm")]
@@ -108,9 +93,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật tên và danh mục của sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/name-category")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật tên và danh mục của sản phẩm")]
@@ -137,9 +119,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>
-        /// Cập nhật mô tả sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/description")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật mô tả sản phẩm")]
@@ -159,9 +138,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật số lượng sản phẩm (Admin và Staff)
-        /// </summary>
         [HttpPut("{id:int}/stock")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật số lượng sản phẩm")]
@@ -181,9 +157,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Xóa sản phẩm khỏi kho (Chỉ Admin)
-        /// </summary>
         [HttpDelete("{id:int}")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Xóa sản phẩm khỏi kho")]
@@ -199,9 +172,6 @@ namespace BookingBakery.Controllers
             return Ok(new { message = "Xóa sản phẩm thành công." });
         }
 
-        /// <summary>
-        /// Cập nhật giá sản phẩm theo tên (Chỉ Admin)
-        /// </summary>
         [HttpPut("by-name/{name}/price")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật giá sản phẩm theo tên")]
@@ -221,9 +191,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật mô tả sản phẩm theo tên (Chỉ Admin)
-        /// </summary>
         [HttpPut("by-name/{name}/description")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật mô tả sản phẩm theo tên")]
@@ -243,9 +210,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Cập nhật số lượng sản phẩm theo tên (Admin và Staff)
-        /// </summary>
         [HttpPut("by-name/{name}/stock")]
         [Authorize(Roles = "1,2")]
         [EndpointSummary("Cập nhật số lượng sản phẩm theo tên")]
@@ -265,9 +229,6 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
-        /// <summary>
-        /// Tìm kiếm sản phẩm theo tên (Khách vãng lai cũng tìm được)
-        /// </summary>
         [HttpGet("search")]
         [AllowAnonymous]
         [EndpointSummary("Tìm kiếm sản phẩm theo tên")]
@@ -279,9 +240,6 @@ namespace BookingBakery.Controllers
             return Ok(products);
         }
 
-        /// <summary>
-        /// Lấy danh sách sản phẩm theo danh mục (Khách vãng lai cũng xem được)
-        /// </summary>
         [HttpGet("category/{categoryId:int}")]
         [AllowAnonymous]
         [EndpointSummary("Lấy danh sách sản phẩm theo danh mục")]
@@ -301,9 +259,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>
-        /// Upload hình ảnh sản phẩm (Chỉ Admin)
-        /// </summary>
         [HttpPut("{id:int}/image")]
         [Authorize(Roles = "1")]
         [Consumes("multipart/form-data")]
@@ -326,7 +281,7 @@ namespace BookingBakery.Controllers
             {
                 using var stream = file.OpenReadStream();
                 var updatedProduct = await _productService.UpdateImageAsync(id, stream, file.FileName);
-                
+
                 if (updatedProduct == null)
                     return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
 
@@ -338,9 +293,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-        /// <summary>
-        /// Upload hình ảnh sản phẩm theo tên (Chỉ Admin)
-        /// </summary>
         [HttpPut("by-name/{name}/image")]
         [Authorize(Roles = "1")]
         [Consumes("multipart/form-data")]
@@ -363,7 +315,7 @@ namespace BookingBakery.Controllers
             {
                 using var stream = file.OpenReadStream();
                 var updatedProduct = await _productService.UpdateImageByNameAsync(name, stream, file.FileName);
-                
+
                 if (updatedProduct == null)
                     return NotFound(new { message = $"Không tìm thấy sản phẩm với tên = {name}." });
 
@@ -375,8 +327,6 @@ namespace BookingBakery.Controllers
             }
         }
 
-
-        // Cập nhật hướng dẫn bảo quản
         [HttpPut("{id:int}/storage-instructions")]
         [Authorize(Roles = "1")]
         [EndpointSummary("Cập nhật hướng dẫn bảo quản")]
@@ -393,6 +343,30 @@ namespace BookingBakery.Controllers
             return Ok(product);
         }
 
+        [HttpPut("{id:int}/size-name")]
+        [Authorize(Roles = "1")]
+        [EndpointSummary("Cập nhật tên size của sản phẩm")]
+        [EndpointDescription("Chỉ Admin. Đổi tên size hiện có (VD: S -> M). Không được trùng size khác đã có của cùng sản phẩm (cùng Name).")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateSizeName(int id, [FromBody] UpdateProductSizeNameDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
+            try
+            {
+                var product = await _productService.UpdateSizeNameAsync(id, dto.SizeName);
+                if (product == null)
+                    return NotFound(new { message = $"Không tìm thấy sản phẩm với ID = {id}." });
+
+                return Ok(product);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

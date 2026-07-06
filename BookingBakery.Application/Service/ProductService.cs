@@ -79,7 +79,7 @@ namespace BookingBakery.Application.Service
                 ProductId = nextId,
                 CategoryId = dto.CategoryId,
                 Name = dto.Name,
-                SizeName = string.IsNullOrWhiteSpace(dto.SizeName) ? string.Empty : dto.SizeName.Trim().ToUpper(),
+                SizeName = dto.SizeName.Trim().ToUpper(),
                 Description = dto.Description,
                 StorageInstructions = dto.StorageInstructions?.Trim(),
                 Price = dto.Price,
@@ -286,6 +286,34 @@ namespace BookingBakery.Application.Service
             await _productRepository.UpdateAsync(x => x.ProductId == id, p);
 
             return await MapToDtoAsync(p, category.Name);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // CẬP NHẬT TÊN SIZE (không tạo dòng mới, chỉ đổi tên size hiện có)
+        // ──────────────────────────────────────────────────────────────
+        public async Task<ProductDto?> UpdateSizeNameAsync(int id, string sizeName)
+        {
+            var p = await _productRepository.FindOneAsync(x => x.ProductId == id);
+            if (p == null) return null;
+
+            var newSizeName = sizeName.Trim().ToUpper();
+
+            // Không cho trùng với size khác đã có của CÙNG sản phẩm (cùng Name)
+            var allProducts = await _productRepository.GetAllAsync();
+            var duplicated = allProducts.Any(x =>
+                x.ProductId != id &&
+                x.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase) &&
+                x.SizeName.Equals(newSizeName, StringComparison.OrdinalIgnoreCase));
+
+            if (duplicated)
+                throw new InvalidOperationException($"Sản phẩm '{p.Name}' đã có size '{newSizeName}' rồi.");
+
+            p.SizeName = newSizeName;
+            p.UpdatedAt = DateTime.UtcNow;
+            await _productRepository.UpdateAsync(x => x.ProductId == id, p);
+
+            var category = await _categoryRepository.FindOneAsync(c => c.CategoryId == p.CategoryId);
+            return await MapToDtoAsync(p, category?.Name ?? "Không xác định");
         }
 
         // ──────────────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ namespace BookingBakery.Application.DTO
         public string Name { get; set; } = string.Empty;
 
         /// <summary>Size của sản phẩm này. VD: S, M, L, XL.</summary>
-        //[Required(ErrorMessage = "Vui lòng nhập tên size.")]
+        [Required(ErrorMessage = "Vui lòng nhập tên size.")]
         [StringLength(20, ErrorMessage = "Tên size không quá 20 ký tự.")]
         public string SizeName { get; set; } = string.Empty;
 
@@ -89,5 +89,13 @@ namespace BookingBakery.Application.DTO
 
         [Required(ErrorMessage = "Category ID là bắt buộc.")]
         public int CategoryId { get; set; }
+    }
+
+    /// <summary>Cập nhật tên size của 1 sản phẩm đã tồn tại (VD: đổi "S" thành "M").</summary>
+    public class UpdateProductSizeNameDto
+    {
+        [Required(ErrorMessage = "Vui lòng nhập tên size.")]
+        [StringLength(20, ErrorMessage = "Tên size không quá 20 ký tự.")]
+        public string SizeName { get; set; } = string.Empty;
     }
 }
