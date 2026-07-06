@@ -26,5 +26,12 @@ namespace BookingBakery.Application.IService
         /// <summary>Gỡ sản phẩm khỏi chương trình khuyến mãi.</summary>
         Task<(bool Success, string Message)> RemoveProductsAsync(
             int promotionId, RemovePromotionProductRequest request);
+
+        /// <summary>Tìm kiếm chương trình khuyến mãi theo tiêu đề (khách vãng lai cũng dùng được).</summary>
+        Task<(bool Success, string Message, List<PromotionSummaryResponse>? Promotions)> SearchPromotionsByTitleAsync(
+            string title);
+
+        Task<(bool Success, string Message, List<PromotionSummaryResponse>? Promotions)> FilterPromotionsByDateRangeAsync(
+            DateOnly startDate, DateOnly endDate);
     }
 }

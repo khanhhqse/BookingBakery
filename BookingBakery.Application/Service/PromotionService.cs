@@ -255,7 +255,26 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 6. XEM CHI TIẾT
+        // 6. TÌM KIẾM PROMOTION THEO TIÊU ĐỀ (Public)
+        // ──────────────────────────────────────────────────────────────
+        public async Task<(bool Success, string Message, List<PromotionSummaryResponse>? Promotions)>
+            SearchPromotionsByTitleAsync(string title)
+        {
+            var promotions = await _promotionRepo.GetAllAsync();
+
+            var matched = promotions
+                .Where(p => p.Title.Contains(title ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var results = new List<PromotionSummaryResponse>();
+            foreach (var p in matched)
+                results.Add(await BuildSummaryAsync(p));
+
+            return (true, "Tìm kiếm chương trình khuyến mãi thành công.", results);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 7. XEM CHI TIẾT
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message, PromotionResponse? Promotion)> GetPromotionByIdAsync(
             int promotionId)
@@ -269,7 +288,7 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 7. THÊM SẢN PHẨM VÀO PROMOTION
+        // 8. THÊM SẢN PHẨM VÀO PROMOTION
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> AddProductsAsync(
             int promotionId, AddPromotionProductRequest request)
@@ -296,7 +315,7 @@ namespace BookingBakery.Application.Service
         }
 
         // ──────────────────────────────────────────────────────────────
-        // 8. GỠ SẢN PHẨM KHỎI PROMOTION
+        // 9. GỠ SẢN PHẨM KHỎI PROMOTION
         // ──────────────────────────────────────────────────────────────
         public async Task<(bool Success, string Message)> RemoveProductsAsync(
             int promotionId, RemovePromotionProductRequest request)
@@ -358,6 +377,30 @@ namespace BookingBakery.Application.Service
             }
 
             return (added, alreadyExists, invalidProducts, null);
+        }
+
+        public async Task<(bool Success, string Message, List<PromotionSummaryResponse>? Promotions)>
+        FilterPromotionsByDateRangeAsync(DateOnly startDate, DateOnly endDate)
+        {
+            if (endDate < startDate)
+                return (false, "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.", null);
+
+            // Quy đổi DateOnly -> DateTime UTC theo đúng cách promotion đang lưu (giờ VN -7h)
+            var filterStart = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-7);
+            var filterEnd = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc).AddHours(-7);
+
+            var promotions = await _promotionRepo.GetAllAsync();
+
+            // Lấy các promotion có khoảng thời gian GIAO NHAU với khoảng lọc
+            var matched = promotions
+                .Where(p => p.StartDate <= filterEnd && p.EndDate >= filterStart)
+                .ToList();
+
+            var results = new List<PromotionSummaryResponse>();
+            foreach (var p in matched)
+                results.Add(await BuildSummaryAsync(p));
+
+            return (true, "Lọc chương trình khuyến mãi theo khoảng ngày thành công.", results);
         }
 
         private async Task<PromotionResponse> BuildFullResponseAsync(Promotion p)

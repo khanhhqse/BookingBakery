@@ -95,6 +95,17 @@ namespace BookingBakery.Controllers
             return Ok(new { message, data = promotions });
         }
 
+        [HttpGet("search")]
+        [AllowAnonymous]
+        [EndpointSummary("Tìm kiếm chương trình khuyến mãi theo tiêu đề")]
+        [EndpointDescription("Khách vãng lai cũng tìm được. Tìm gần đúng (không phân biệt hoa/thường).")]
+        [ProducesResponseType(typeof(List<PromotionSummaryResponse>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SearchByTitle([FromQuery] string title)
+        {
+            var (success, message, promotions) = await _promotionService.SearchPromotionsByTitleAsync(title ?? string.Empty);
+            return Ok(new { message, data = promotions });
+        }
+
         [HttpGet("{promotionId:int}")]
         [AllowAnonymous]
         [EndpointSummary("Xem chi tiết chương trình khuyến mãi")]
@@ -147,6 +158,24 @@ namespace BookingBakery.Controllers
 
             return success
                 ? Ok(new { message })
+                : BadRequest(new { message });
+        }
+
+        [HttpGet("filter")]
+        [AllowAnonymous]
+        [EndpointSummary("Lọc chương trình khuyến mãi theo khoảng ngày")]
+        [EndpointDescription("Khách vãng lai cũng dùng được. Trả về các promotion có khoảng thời gian giao nhau với [startDate, endDate].")]
+        [ProducesResponseType(typeof(List<PromotionSummaryResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> FilterByDateRange(
+            [FromQuery] DateOnly startDate,
+            [FromQuery] DateOnly endDate)
+        {
+            var (success, message, promotions) =
+                await _promotionService.FilterPromotionsByDateRangeAsync(startDate, endDate);
+
+            return success
+                ? Ok(new { message, data = promotions })
                 : BadRequest(new { message });
         }
     }
