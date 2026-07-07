@@ -1,4 +1,4 @@
-﻿using BookingBakery.Domain.IDomain;
+using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
 using BookingBakery.Infrastructure.Persistence;
 using MongoDB.Driver;
@@ -17,6 +17,7 @@ namespace BookingBakery.Infrastructure.Persistence
             // Drop index cũ nếu còn
             try { _collection.Indexes.DropOne("cart_id_1_product_id_1_size_name_1"); } catch { }
             try { _collection.Indexes.DropOne("idx_cart_product_size_unique"); } catch { }
+            try { _collection.Indexes.DropOne("cart_id_1_product_id_1"); } catch { }
 
             // Composite key mới: (cart_id, product_id) — size đã nằm trong Product
             var idx = Builders<CartItem>.IndexKeys
