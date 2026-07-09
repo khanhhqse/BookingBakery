@@ -1,10 +1,12 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
 using BookingBakery.Infrastructure.Helper;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using ClosedXML.Excel;
+using System.Globalization;
 
 namespace BookingBakery.Application.Service
 {
@@ -468,5 +470,275 @@ namespace BookingBakery.Application.Service
 
         private static decimal CalculateSalePrice(decimal originalPrice, Promotion promotion)
             => PromotionPriceHelper.CalculateSalePrice(originalPrice, promotion);
+
+        public async Task<(bool Success, string Message, ImportPromotionResultDto? Result)> ImportPromotionsFromExcelAsync(
+            Microsoft.AspNetCore.Http.IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return (false, "Vui lòng tải lên file Excel.", null);
+
+            var allowedExtensions = new[] { ".xlsx" };
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!allowedExtensions.Contains(extension))
+                return (false, "Định dạng file không hợp lệ. Chỉ chấp nhận file .xlsx", null);
+
+            var result = new ImportPromotionResultDto();
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                using var workbook = new XLWorkbook(stream);
+                var worksheet = workbook.Worksheet(1);
+                
+                var rangeUsed = worksheet.RangeUsed();
+                if (rangeUsed == null)
+                    return (false, "File Excel không chứa dữ liệu.", null);
+
+                var rows = rangeUsed.RowsUsed().Skip(1); // Bỏ qua dòng header
+
+                var allPromotions = await _promotionRepo.GetAllAsync();
+                var nextPromotionId = await _promotionRepo.GetNextPromotionIdAsync();
+
+                foreach (var row in rows)
+                {
+                    int rowNumber = row.RowNumber();
+
+                    // Đọc dữ liệu từ các cột
+                    var productName = row.Cell(1).GetValue<string>()?.Trim();
+                    var sizeName = row.Cell(2).GetValue<string>()?.Trim();
+                    var title = row.Cell(3).GetValue<string>()?.Trim();
+                    var content = row.Cell(4).GetValue<string>()?.Trim();
+                    var discountTypeRaw = row.Cell(5).GetValue<string>()?.Trim();
+                    var discountValueRaw = row.Cell(6).GetValue<string>()?.Trim();
+
+                    // Kiểm tra nếu dòng hoàn toàn trống
+                    if (string.IsNullOrEmpty(productName) && string.IsNullOrEmpty(title))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(productName))
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Tên sản phẩm không được để trống.");
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(sizeName))
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Size sản phẩm không được để trống.");
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(title))
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Tiêu đề chương trình khuyến mãi không được để trống.");
+                        continue;
+                    }
+
+                    // Tìm sản phẩm trong DB
+                    var product = await _productRepo.FindOneAsync(p =>
+                        p.Name.ToLower() == productName.ToLower() &&
+                        p.SizeName.ToLower() == sizeName.ToLower());
+
+                    if (product == null)
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Sản phẩm '{productName}' size '{sizeName}' không tồn tại trong kho.");
+                        continue;
+                    }
+
+                    // Parse discount type: 1 -> percent, 2 -> fixed
+                    string discountType;
+                    int? typeVal = null;
+                    if (int.TryParse(discountTypeRaw, out var parsedInt))
+                    {
+                        typeVal = parsedInt;
+                    }
+                    else if (double.TryParse(discountTypeRaw, out var parsedDouble))
+                    {
+                        typeVal = (int)parsedDouble;
+                    }
+
+                    if (typeVal == 1)
+                    {
+                        discountType = PromotionDiscountType.Percent;
+                    }
+                    else if (typeVal == 2)
+                    {
+                        discountType = PromotionDiscountType.Fixed;
+                    }
+                    else
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Loại khuyến mãi không hợp lệ (chỉ chấp nhận 1 hoặc 2).");
+                        continue;
+                    }
+
+                    // Parse discount value
+                    if (!decimal.TryParse(discountValueRaw, out var discountValue))
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Giá trị giảm không đúng định dạng số.");
+                        continue;
+                    }
+
+                    // Validate rules
+                    if (discountType == PromotionDiscountType.Percent)
+                    {
+                        if (discountValue <= 0 || discountValue > 100)
+                        {
+                            result.FailCount++;
+                            result.Errors.Add($"Dòng {rowNumber}: Giá trị giảm theo % phải trong khoảng 1-100.");
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (discountValue <= 0)
+                        {
+                            result.FailCount++;
+                            result.Errors.Add($"Dòng {rowNumber}: Số tiền giảm phải lớn hơn 0.");
+                            continue;
+                        }
+                        if (discountValue >= product.Price)
+                        {
+                            result.FailCount++;
+                            result.Errors.Add($"Dòng {rowNumber}: Số tiền giảm ({discountValue:N0}đ) phải nhỏ hơn giá sản phẩm ({product.Price:N0}đ).");
+                            continue;
+                        }
+                    }
+
+                    // Parse dates
+                    var startDateParsed = ParseExcelDate(row.Cell(7));
+                    var endDateParsed = ParseExcelDate(row.Cell(8));
+
+                    if (startDateParsed == null)
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Ngày bắt đầu không hợp lệ.");
+                        continue;
+                    }
+                    if (endDateParsed == null)
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Ngày kết thúc không hợp lệ.");
+                        continue;
+                    }
+
+                    var startDate = startDateParsed.Value;
+                    var endDate = endDateParsed.Value;
+
+                    if (endDate <= startDate)
+                    {
+                        result.FailCount++;
+                        result.Errors.Add($"Dòng {rowNumber}: Ngày kết thúc phải sau ngày bắt đầu.");
+                        continue;
+                    }
+
+                    // Quy đổi sang UTC (múi giờ GMT+7, trừ đi 7 tiếng)
+                    var startDateTime = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc).AddHours(-7);
+                    var endDateTime = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc).AddHours(17).AddMinutes(59).AddSeconds(59);
+
+                    var now = DateTime.UtcNow;
+
+                    // Kiểm tra xem chương trình khuyến mãi đã tồn tại chưa (khớp Title, Type, Value)
+                    var existingPromotion = allPromotions.FirstOrDefault(p =>
+                        p.Title.Equals(title, StringComparison.OrdinalIgnoreCase) &&
+                        p.DiscountType == discountType &&
+                        p.DiscountValue == discountValue);
+
+                    int targetPromotionId;
+
+                    if (existingPromotion != null)
+                    {
+                        // Kiểm tra xem ngày bắt đầu/kết thúc có trùng khớp hoàn toàn không
+                        bool datesMatch = Math.Abs((existingPromotion.StartDate - startDateTime).TotalSeconds) < 1
+                                       && Math.Abs((existingPromotion.EndDate - endDateTime).TotalSeconds) < 1;
+
+                        if (!datesMatch)
+                        {
+                            // Nếu khác ngày, cập nhật lại ngày
+                            existingPromotion.StartDate = startDateTime;
+                            existingPromotion.EndDate = endDateTime;
+                            existingPromotion.UpdatedAt = now;
+                            await _promotionRepo.UpdateAsync(existingPromotion);
+                        }
+
+                        targetPromotionId = existingPromotion.PromotionId;
+                    }
+                    else
+                    {
+                        // Tạo Promotion mới
+                        var promotion = new Promotion
+                        {
+                            PromotionId = nextPromotionId++,
+                            Title = title,
+                            Content = content,
+                            BannerUrl = null,
+                            DiscountType = discountType,
+                            DiscountValue = discountValue,
+                            StartDate = startDateTime,
+                            EndDate = endDateTime,
+                            Status = PromotionStatus.Active,
+                            CreatedAt = now,
+                            UpdatedAt = now
+                        };
+
+                        await _promotionRepo.CreateAsync(promotion);
+                        allPromotions.Add(promotion); // Lưu vào list in-memory để dùng lại cho các dòng sau
+                        targetPromotionId = promotion.PromotionId;
+                    }
+
+                    // Liên kết sản phẩm nếu chưa liên kết
+                    var exists = await _productPromotionRepo.ExistsAsync(targetPromotionId, product.ProductId);
+                    if (!exists)
+                    {
+                        await _productPromotionRepo.CreateAsync(new ProductPromotion
+                        {
+                            PromotionId = targetPromotionId,
+                            ProductId = product.ProductId,
+                            CreatedAt = now
+                        });
+                    }
+
+                    result.SuccessCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Có lỗi xảy ra khi xử lý file: {ex.Message}", null);
+            }
+
+            string finalMessage = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailCount}.";
+            return (true, finalMessage, result);
+        }
+
+        private static DateTime? ParseExcelDate(IXLCell cell)
+        {
+            if (cell.DataType == XLDataType.DateTime)
+            {
+                return cell.GetDateTime();
+            }
+
+            var str = cell.GetValue<string>()?.Trim();
+            if (string.IsNullOrEmpty(str)) return null;
+
+            string[] formats = {
+                "dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "MM/dd/yyyy",
+                "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "dd-MM-yyyy HH:mm:ss"
+            };
+
+            if (DateTime.TryParseExact(str, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            {
+                return dt;
+            }
+            if (DateTime.TryParse(str, out var dt2))
+            {
+                return dt2;
+            }
+
+            return null;
+        }
     }
 }

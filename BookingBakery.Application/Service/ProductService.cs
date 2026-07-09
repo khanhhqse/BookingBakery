@@ -61,6 +61,17 @@ namespace BookingBakery.Application.Service
             if (category == null)
                 throw new InvalidOperationException($"Danh mục với ID = {dto.CategoryId} không tồn tại.");
 
+            var all = await _productRepository.GetAllAsync();
+            var sizeUpper = dto.SizeName.Trim().ToUpper();
+            var nameTrimmed = dto.Name.Trim();
+
+            var isDuplicated = all.Any(p =>
+                p.Name.Equals(nameTrimmed, StringComparison.OrdinalIgnoreCase) &&
+                p.SizeName.Equals(sizeUpper, StringComparison.OrdinalIgnoreCase));
+
+            if (isDuplicated)
+                throw new InvalidOperationException($"Sản phẩm '{nameTrimmed}' với size '{sizeUpper}' đã tồn tại trong kho.");
+
             using var imageStream = dto.Image.OpenReadStream();
             var uploadParams = new ImageUploadParams
             {
@@ -71,15 +82,14 @@ namespace BookingBakery.Application.Service
             if (uploadResult.Error != null)
                 throw new InvalidOperationException($"Tải ảnh lên thất bại: {uploadResult.Error.Message}");
 
-            var all = await _productRepository.GetAllAsync();
             var nextId = all.Any() ? all.Max(p => p.ProductId) + 1 : 1;
 
             var product = new Product
             {
                 ProductId = nextId,
                 CategoryId = dto.CategoryId,
-                Name = dto.Name,
-                SizeName = dto.SizeName.Trim().ToUpper(),
+                Name = nameTrimmed,
+                SizeName = sizeUpper,
                 Description = dto.Description,
                 StorageInstructions = dto.StorageInstructions?.Trim(),
                 Price = dto.Price,
