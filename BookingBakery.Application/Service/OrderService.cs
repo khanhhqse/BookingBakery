@@ -14,6 +14,7 @@ namespace BookingBakery.Application.Service
         private readonly IUserProfileRepository _profileRepo;
         private readonly IAuthRepository _authRepo;
         private readonly IPromotionPriceHelper _promotionPriceHelper;
+        private readonly IVoucherService _voucherService;
 
         public OrderService(
             IOrderRepository orderRepo,
@@ -22,7 +23,8 @@ namespace BookingBakery.Application.Service
             IProductRepository productRepo,
             IUserProfileRepository profileRepo,
             IAuthRepository authRepo,
-            IPromotionPriceHelper promotionPriceHelper)
+            IPromotionPriceHelper promotionPriceHelper,
+            IVoucherService voucherService)
         {
             _orderRepo = orderRepo;
             _cartRepo = cartRepo;
@@ -31,6 +33,7 @@ namespace BookingBakery.Application.Service
             _profileRepo = profileRepo;
             _authRepo = authRepo;
             _promotionPriceHelper = promotionPriceHelper;
+            _voucherService = voucherService;
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -123,6 +126,39 @@ namespace BookingBakery.Application.Service
             if (orderItems.Count == 0)
                 return (false, "Không có sản phẩm hợp lệ nào để đặt hàng. Vui lòng kiểm tra lại giỏ hàng.", null);
 
+            // ── Áp voucher (nếu có) ──────────────────────────────────
+            // Tại thời điểm này mọi cart item đều hợp lệ (đủ hàng, chưa sold_out),
+            // nên breakdown từ VoucherService sẽ khớp 1-1 với orderItems vừa build.
+            string? appliedVoucherCode = null;
+            decimal voucherDiscountAmount = 0;
+
+            var voucherCode = request.VoucherCode?.Trim();
+            if (!string.IsNullOrWhiteSpace(voucherCode))
+            {
+                ApplyVoucherResultDto voucherResult;
+                try
+                {
+                    voucherResult = await _voucherService.ValidateAndCalculateAsync(userId, voucherCode);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return (false, ex.Message, null);
+                }
+
+                // Ghi đè UnitPrice/TotalPrice từng dòng theo giá đã áp voucher
+                foreach (var item in orderItems)
+                {
+                    var breakdown = voucherResult.Items.FirstOrDefault(i => i.ProductId == item.ProductId);
+                    if (breakdown == null) continue;
+
+                    item.UnitPrice = breakdown.FinalPrice;
+                    item.TotalPrice = breakdown.FinalPrice * item.Quantity;
+                }
+
+                appliedVoucherCode = voucherResult.VoucherCode;
+                voucherDiscountAmount = voucherResult.VoucherDiscountAmount;
+            }
+
             var totalPrice = orderItems.Sum(i => i.TotalPrice);
             var orderId = await _orderRepo.GetNextOrderIdAsync();
             var now = DateTime.UtcNow;
@@ -142,6 +178,8 @@ namespace BookingBakery.Application.Service
                 Items = orderItems,
                 Status = OrderStatus.ChoXacNhan,
                 TotalPrice = totalPrice,
+                VoucherCode = appliedVoucherCode,
+                VoucherDiscountAmount = voucherDiscountAmount,
                 ShippingAddress = shippingAddress,
                 Phone = phone,
                 Note = request.Note,
@@ -163,6 +201,11 @@ namespace BookingBakery.Application.Service
 
             await _orderRepo.CreateAsync(order);
             await _cartItemRepo.DeleteManyAsync(ci => ci.CartId == cart.CartId);
+
+            // Chỉ đánh dấu voucher đã dùng SAU KHI đơn hàng đã tạo thành công,
+            // để tránh trường hợp đơn tạo lỗi nhưng voucher vẫn bị trừ mất lượt.
+            if (!string.IsNullOrWhiteSpace(appliedVoucherCode))
+                await _voucherService.ConfirmVoucherUsageAsync(userId, appliedVoucherCode);
 
             return (true,
                 "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.",
@@ -499,6 +542,8 @@ namespace BookingBakery.Application.Service
                 }).ToList(),
                 Status = o.Status,
                 TotalPrice = o.TotalPrice,
+                VoucherCode = o.VoucherCode,
+                VoucherDiscountAmount = o.VoucherDiscountAmount,
                 ShippingAddress = o.ShippingAddress,
                 Phone = o.Phone,
                 Note = o.Note,
@@ -532,6 +577,8 @@ namespace BookingBakery.Application.Service
                 TotalQuantity = o.Items.Sum(i => i.Quantity),
                 Status = o.Status,
                 TotalPrice = o.TotalPrice,
+                VoucherCode = o.VoucherCode,
+                VoucherDiscountAmount = o.VoucherDiscountAmount,
                 ShippingAddress = o.ShippingAddress,
                 Phone = o.Phone,
                 Note = o.Note,
