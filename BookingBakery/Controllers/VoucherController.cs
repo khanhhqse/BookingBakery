@@ -31,25 +31,25 @@ namespace BookingBakery.Presentation.Controllers
 
         [HttpGet]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Lấy danh sách tất cả voucher")]
+        [EndpointSummary("Admin lấy danh sách tất cả voucher")]
         public async Task<IActionResult> GetAll()
             => Ok(await _voucherService.GetAllAsync());
 
         [HttpGet("{id}")]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Lấy chi tiết 1 voucher")]
+        [EndpointSummary("Admin lấy chi tiết 1 voucher")]
         public async Task<IActionResult> GetById(int id)
             => Ok(await _voucherService.GetByIdAsync(id));
 
         [HttpGet("search")]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Tìm voucher theo mã code")]
+        [EndpointSummary("Admin tìm voucher theo mã code")]
         public async Task<IActionResult> Search([FromQuery] string keyword)
             => Ok(await _voucherService.SearchByCodeAsync(keyword));
 
         [HttpGet("filter")]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Lọc voucher theo khoảng ngày")]
+        [EndpointSummary("Admin lọc voucher theo khoảng ngày")]
         public async Task<IActionResult> Filter([FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
             => Ok(await _voucherService.FilterByDateRangeAsync(from, to));
 
@@ -62,13 +62,13 @@ namespace BookingBakery.Presentation.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Chỉnh sửa thông tin voucher")]
+        [EndpointSummary("Admin chỉnh sửa thông tin voucher")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateVoucherRequest request)
             => Ok(await _voucherService.UpdateAsync(id, request));
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Vô hiệu hóa voucher")]
+        [EndpointSummary("Admin vô hiệu hóa voucher")]
         public async Task<IActionResult> Delete(int id)
         {
             await _voucherService.DeleteAsync(id);
@@ -79,19 +79,19 @@ namespace BookingBakery.Presentation.Controllers
 
         [HttpGet("me/used")]
         [Authorize(Roles = "3")]
-        [EndpointSummary("Xem voucher đã sử dụng")]
+        [EndpointSummary("Customer xem voucher đã sử dụng")]
         public async Task<IActionResult> GetMyUsedVouchers()
             => Ok(await _voucherService.GetMyUsedVouchersAsync(GetCurrentUserId()));
 
         [HttpGet("me/unused")]
         [Authorize(Roles = "3")]
-        [EndpointSummary("Xem voucher chưa sử dụng")]
+        [EndpointSummary("Customer xem voucher chưa sử dụng")]
         public async Task<IActionResult> GetMyUnusedVouchers()
             => Ok(await _voucherService.GetMyUnusedVouchersAsync(GetCurrentUserId()));
 
         [HttpPost("apply")]
         [Authorize(Roles = "3")]
-        [EndpointSummary("Xem trước hiệu lực + số tiền được giảm khi áp voucher vào giỏ hàng (checkout)")]
+        [EndpointSummary("Customer xem trước hiệu lực + số tiền được giảm khi áp voucher vào giỏ hàng (checkout)")]
         public async Task<IActionResult> ApplyVoucher([FromBody] ApplyVoucherRequest request)
             => Ok(await _voucherService.ValidateAndCalculateAsync(GetCurrentUserId(), request.VoucherCode));
     }

@@ -148,10 +148,47 @@ namespace BookingBakery.Application.Service
         // ──────────────────────────────────────────────────────────
 
         public async Task<List<VoucherDto>> GetMyUsedVouchersAsync(int userId)
-            => await GetVouchersByUserVoucherStatusAsync(userId, "used");
+        {
+            // "Đã dùng" luôn phản ánh đúng qua bảng UserVoucher, vì bản ghi UserVoucher
+            // chỉ được tạo/đánh dấu khi ConfirmVoucherUsageAsync chạy (sau khi đặt hàng thành công).
+            return await GetVouchersByUserVoucherStatusAsync(userId, "used");
+        }
 
         public async Task<List<VoucherDto>> GetMyUnusedVouchersAsync(int userId)
-            => await GetVouchersByUserVoucherStatusAsync(userId, "unused");
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var allVouchers = (await _voucherRepository.GetAllAsync())
+                .Where(v => v.Status == "active" && v.StartDate <= today && v.EndDate >= today)
+                .ToList();
+
+            // Danh sách voucherId mà user này đã dùng rồi (để loại trừ)
+            var usedUserVouchers = await _userVoucherRepository.GetByUserIdAsync(userId, "used");
+            var usedVoucherIds = usedUserVouchers.Select(uv => uv.VoucherId).ToHashSet();
+
+            var result = new List<VoucherDto>();
+
+            foreach (var voucher in allVouchers)
+            {
+                if (usedVoucherIds.Contains(voucher.VoucherId))
+                    continue; // user đã dùng voucher này rồi -> không hiện ở "chưa dùng"
+
+                if (voucher.RequiresAssignment)
+                {
+                    // Voucher loại "được gán riêng": chỉ hiện nếu user thực sự có UserVoucher status = unused
+                    var userVoucher = await _userVoucherRepository.GetByVoucherAndUserAsync(voucher.VoucherId, userId);
+                    if (userVoucher != null && userVoucher.Status == "unused")
+                        result.Add(await MapToDtoAsync(voucher));
+                }
+                else
+                {
+                    // Voucher tự do (không cần gán): mọi Customer đều thấy nếu chưa dùng,
+                    // kể cả khi chưa từng có bản ghi UserVoucher nào.
+                    result.Add(await MapToDtoAsync(voucher));
+                }
+            }
+
+            return result;
+        }
 
         private async Task<List<VoucherDto>> GetVouchersByUserVoucherStatusAsync(int userId, string status)
         {
