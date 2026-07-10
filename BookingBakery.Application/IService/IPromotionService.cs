@@ -1,4 +1,4 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 
 namespace BookingBakery.Application.IService
 {
@@ -33,5 +33,8 @@ namespace BookingBakery.Application.IService
 
         Task<(bool Success, string Message, List<PromotionSummaryResponse>? Promotions)> FilterPromotionsByDateRangeAsync(
             DateOnly startDate, DateOnly endDate);
+
+        Task<(bool Success, string Message, ImportPromotionResultDto? Result)> ImportPromotionsFromExcelAsync(
+            Microsoft.AspNetCore.Http.IFormFile file);
     }
 }

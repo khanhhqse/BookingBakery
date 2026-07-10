@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
 
 namespace BookingBakery.Application.DTO
@@ -129,5 +129,18 @@ namespace BookingBakery.Application.DTO
         public string Status { get; set; } = string.Empty;
         public bool IsOngoing { get; set; }
         public int ProductCount { get; set; }
+    }
+
+    public class ImportPromotionResultDto
+    {
+        public int SuccessCount { get; set; }
+        public int FailCount { get; set; }
+        public List<string> Errors { get; set; } = new();
+    }
+
+    public class ImportExcelRequest
+    {
+        [Required(ErrorMessage = "Vui lòng chọn file Excel.")]
+        public IFormFile File { get; set; } = null!;
     }
 }

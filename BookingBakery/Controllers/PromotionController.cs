@@ -1,4 +1,4 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -176,6 +176,25 @@ namespace BookingBakery.Controllers
 
             return success
                 ? Ok(new { message, data = promotions })
+                : BadRequest(new { message });
+        }
+
+        [HttpPost("import")]
+        [Authorize(Roles = "1,2")]
+        [Consumes("multipart/form-data")]
+        [EndpointSummary("Import chương trình khuyến mãi từ file Excel")]
+        [EndpointDescription("Admin và Staff. Upload file Excel (.xlsx) chứa danh sách khuyến mãi.Các cột trong file: Tên sản phẩm, Size, Tiêu đề, Nội dung, Loại giảm giá (1-percent, 2-fixed), Giá trị giảm, Ngày bắt đầu, Ngày kết thúc. Yêu cầu modify date trong excel thành dd-mm-yyyy")]
+        [ProducesResponseType(typeof(ImportPromotionResultDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Import([FromForm] ImportExcelRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var (success, message, result) = await _promotionService.ImportPromotionsFromExcelAsync(request.File);
+
+            return success
+                ? Ok(new { message, data = result })
                 : BadRequest(new { message });
         }
     }
