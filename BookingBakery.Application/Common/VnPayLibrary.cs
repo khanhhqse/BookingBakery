@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
@@ -7,8 +9,9 @@ namespace BookingBakery.Application.Common
 {
     public class VnPayLibrary
     {
-        private readonly SortedList<string, string> _requestData = new SortedList<string, string>(StringComparer.Ordinal);
-        private readonly SortedList<string, string> _responseData = new SortedList<string, string>(StringComparer.Ordinal);
+        public const string VERSION = "2.1.0";
+        private readonly SortedList<string, string> _requestData = new SortedList<string, string>(new VnPayCompare());
+        private readonly SortedList<string, string> _responseData = new SortedList<string, string>(new VnPayCompare());
 
         public void AddRequestData(string key, string value)
         {
@@ -28,82 +31,103 @@ namespace BookingBakery.Application.Common
 
         public string GetResponseData(string key)
         {
-            return _responseData.TryGetValue(key, out var value) ? value : string.Empty;
+            if (_responseData.TryGetValue(key, out var retValue))
+            {
+                return retValue;
+            }
+            return string.Empty;
         }
 
         public string CreateRequestUrl(string baseUrl, string vnpHashSecret)
         {
-            var queryString = new StringBuilder();
-            var rawData = new StringBuilder();
-
-            foreach (var kv in _requestData)
+            StringBuilder data = new StringBuilder();
+            foreach (KeyValuePair<string, string> kv in _requestData)
             {
-                if (queryString.Length > 0)
+                if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    queryString.Append("&");
-                    rawData.Append("&");
+                    data.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
                 }
-                queryString.Append(UrlEncode(kv.Key) + "=" + UrlEncode(kv.Value));
-                rawData.Append(UrlEncode(kv.Key) + "=" + UrlEncode(kv.Value));
             }
-
-            string secureHash = HmacSha512(vnpHashSecret, rawData.ToString());
-            return baseUrl + "?" + queryString + "&vnp_SecureHash=" + secureHash;
+            string queryString = data.ToString();
+            
+            baseUrl += "?" + queryString;
+            string signData = queryString;
+            if (signData.Length > 0)
+            {
+                signData = signData.Remove(data.Length - 1, 1);
+            }
+            string vnp_SecureHash = Utils.HmacSHA512(vnpHashSecret, signData);
+            baseUrl += "vnp_SecureHash=" + vnp_SecureHash;
+           
+            return baseUrl;
         }
 
         public bool ValidateSignature(string inputHash, string secretKey)
         {
-            var rawData = new StringBuilder();
-            foreach (var kv in _responseData)
-            {
-                if (kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                {
-                    if (rawData.Length > 0)
-                    {
-                        rawData.Append("&");
-                    }
-                    rawData.Append(UrlEncode(kv.Key) + "=" + UrlEncode(kv.Value));
-                }
-            }
-
-            string myChecksum = HmacSha512(secretKey, rawData.ToString());
-            return myChecksum.Equals(inputHash, StringComparison.OrdinalIgnoreCase);
+            string rspRaw = GetResponseData();
+            string myChecksum = Utils.HmacSHA512(secretKey, rspRaw);
+            Console.WriteLine($"[VNPAY VALIDATE] SecretKey: {secretKey}");
+            Console.WriteLine($"[VNPAY VALIDATE] RawData (to be hashed): {rspRaw}");
+            Console.WriteLine($"[VNPAY VALIDATE] InputHash (from VNPay): {inputHash}");
+            Console.WriteLine($"[VNPAY VALIDATE] MyChecksum: {myChecksum}");
+            return myChecksum.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
         }
 
-        private static string HmacSha512(string key, string inputData)
+        private string GetResponseData()
         {
-            var hash = new StringBuilder();
+            StringBuilder data = new StringBuilder();
+            if (_responseData.ContainsKey("vnp_SecureHashType"))
+            {
+                _responseData.Remove("vnp_SecureHashType");
+            }
+            if (_responseData.ContainsKey("vnp_SecureHash"))
+            {
+                _responseData.Remove("vnp_SecureHash");
+            }
+            foreach (KeyValuePair<string, string> kv in _responseData)
+            {
+                if (!string.IsNullOrEmpty(kv.Value))
+                {
+                    data.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
+                }
+            }
+            //remove last '&'
+            if (data.Length > 0)
+            {
+                data.Remove(data.Length - 1, 1);
+            }
+            return data.ToString();
+        }
+    }
+
+    public static class Utils
+    {
+        public static string HmacSHA512(string key, string inputData)
+        {
+            var hash = new StringBuilder(); 
             byte[] keyBytes = Encoding.UTF8.GetBytes(key);
             byte[] inputBytes = Encoding.UTF8.GetBytes(inputData);
             using (var hmac = new HMACSHA512(keyBytes))
             {
                 byte[] hashValue = hmac.ComputeHash(inputBytes);
-                foreach (byte theByte in hashValue)
+                foreach (var theByte in hashValue)
                 {
                     hash.Append(theByte.ToString("x2"));
                 }
             }
             return hash.ToString();
         }
+    }
 
-        private string UrlEncode(string str)
+    public class VnPayCompare : IComparer<string>
+    {
+        public int Compare(string? x, string? y)
         {
-            if (string.IsNullOrEmpty(str)) return string.Empty;
-            StringBuilder sb = new StringBuilder();
-            byte[] bytes = Encoding.UTF8.GetBytes(str);
-            foreach (byte b in bytes)
-            {
-                if ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || 
-                    b == '-' || b == '_' || b == '.' || b == '~')
-                {
-                    sb.Append((char)b);
-                }
-                else
-                {
-                    sb.AppendFormat("%{0:X2}", b);
-                }
-            }
-            return sb.ToString();
+            if (x == y) return 0;
+            if (x == null) return -1;
+            if (y == null) return 1;
+            var vnpCompare = CompareInfo.GetCompareInfo("en-US");
+            return vnpCompare.Compare(x, y, CompareOptions.Ordinal);
         }
     }
 }
