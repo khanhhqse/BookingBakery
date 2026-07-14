@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace BookingBakery.Domain.Models
@@ -85,6 +85,12 @@ namespace BookingBakery.Domain.Models
         /// <summary>Phương thức thanh toán: "COD" | "Chuyển khoản".</summary>
         [BsonElement("payment_method")]
         public string PaymentMethod { get; set; } = string.Empty;
+
+        [BsonElement("is_paid")]
+        public bool IsPaid { get; set; } = false;
+
+        [BsonElement("payment_status")]
+        public string PaymentStatus { get; set; } = "Chưa thanh toán";
 
         /// <summary>Thời điểm chuyển sang "Đang giao" — dùng để tính auto-complete 48h (BR-L03).</summary>
         [BsonElement("delivered_at")]

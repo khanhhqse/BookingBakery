@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace BookingBakery.Application.DTO
 {
@@ -42,6 +42,12 @@ namespace BookingBakery.Application.DTO
         /// (hết hạn, đã dùng, không đạt điều kiện...) đơn hàng sẽ báo lỗi và KHÔNG được tạo.
         /// </summary>
         public string? VoucherCode { get; set; }
+
+        /// <summary>
+        /// Đường dẫn Frontend nhận kết quả sau khi thanh toán.
+        /// Nếu để trống, hệ thống sẽ sử dụng cấu hình mặc định trong appsettings.json.
+        /// </summary>
+        public string? ReturnUrl { get; set; }
     }
 
     public class CancelOrderRequest
@@ -124,6 +130,8 @@ namespace BookingBakery.Application.DTO
         public string? Note { get; set; }
         public string? CancelReason { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public bool IsPaid { get; set; }
+        public string PaymentStatus { get; set; } = string.Empty;
         public DateTime? DeliveredAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
@@ -147,6 +155,8 @@ namespace BookingBakery.Application.DTO
         public string? Note { get; set; }
         public string? CancelReason { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public bool IsPaid { get; set; }
+        public string PaymentStatus { get; set; } = string.Empty;
         public DateTime? DeliveredAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

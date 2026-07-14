@@ -1,7 +1,8 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using BookingBakery.Domain.IDomain;
 using BookingBakery.Domain.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace BookingBakery.Application.Service
 {
@@ -15,6 +16,7 @@ namespace BookingBakery.Application.Service
         private readonly IAuthRepository _authRepo;
         private readonly IPromotionPriceHelper _promotionPriceHelper;
         private readonly IVoucherService _voucherService;
+        private readonly IConfiguration _configuration;
 
         public OrderService(
             IOrderRepository orderRepo,
@@ -24,7 +26,8 @@ namespace BookingBakery.Application.Service
             IUserProfileRepository profileRepo,
             IAuthRepository authRepo,
             IPromotionPriceHelper promotionPriceHelper,
-            IVoucherService voucherService)
+            IVoucherService voucherService,
+            IConfiguration configuration)
         {
             _orderRepo = orderRepo;
             _cartRepo = cartRepo;
@@ -34,23 +37,24 @@ namespace BookingBakery.Application.Service
             _authRepo = authRepo;
             _promotionPriceHelper = promotionPriceHelper;
             _voucherService = voucherService;
+            _configuration = configuration;
         }
 
         // ──────────────────────────────────────────────────────────────
         // 1. ĐẶT HÀNG (BR-O01)
         // ──────────────────────────────────────────────────────────────
-        public async Task<(bool Success, string Message, OrderResponse? Order)> PlaceOrderAsync(
+        public async Task<(bool Success, string Message, OrderResponse? Order, string? PaymentUrl)> PlaceOrderAsync(
             int userId, PlaceOrderRequest request)
         {
             var cart = await _cartRepo.FindOneAsync(c => c.UserId == userId);
             if (cart == null)
-                return (false, "Bạn chưa có giỏ hàng. Vui lòng thêm sản phẩm vào giỏ trước khi đặt hàng.", null);
+                return (false, "Bạn chưa có giỏ hàng. Vui lòng thêm sản phẩm vào giỏ trước khi đặt hàng.", null, null);
 
             var cartItemsEnum = await _cartItemRepo.FindManyAsync(ci => ci.CartId == cart.CartId);
             var cartItems = cartItemsEnum.ToList();
 
             if (cartItems.Count == 0)
-                return (false, "Giỏ hàng của bạn đang trống. Vui lòng thêm ít nhất một sản phẩm trước khi đặt hàng.", null);
+                return (false, "Giỏ hàng của bạn đang trống. Vui lòng thêm ít nhất một sản phẩm trước khi đặt hàng.", null, null);
 
             var profile = await _profileRepo.FindOneAsync(p => p.UserId == userId);
             var shippingAddress = request.ShippingAddress?.Trim();
@@ -62,11 +66,11 @@ namespace BookingBakery.Application.Service
                 if (string.IsNullOrWhiteSpace(shippingAddress))
                     return (false,
                         "Bạn chưa có địa chỉ giao hàng trong hồ sơ. "
-                        + "Vui lòng cập nhật tại mục \"Hồ sơ của tôi\" hoặc nhập trực tiếp khi đặt hàng nhé.", null);
+                        + "Vui lòng cập nhật tại mục \"Hồ sơ của tôi\" hoặc nhập trực tiếp khi đặt hàng nhé.", null, null);
             }
 
             if (shippingAddress.Length < 10 || shippingAddress.Length > 255)
-                return (false, "Địa chỉ giao hàng phải từ 10 đến 255 ký tự.", null);
+                return (false, "Địa chỉ giao hàng phải từ 10 đến 255 ký tự.", null, null);
 
             if (string.IsNullOrWhiteSpace(phone))
             {
@@ -75,7 +79,7 @@ namespace BookingBakery.Application.Service
                 if (string.IsNullOrWhiteSpace(phone))
                     return (false,
                         "Bạn chưa có số điện thoại trong hồ sơ. " +
-                        "Vui lòng cập nhật số điện thoại tại mục hồ sơ cá nhân hoặc nhập trực tiếp khi đặt hàng nhé.", null);
+                        "Vui lòng cập nhật số điện thoại tại mục hồ sơ cá nhân hoặc nhập trực tiếp khi đặt hàng nhé.", null, null);
             }
 
             var orderItems = new List<OrderItem>();
@@ -116,15 +120,15 @@ namespace BookingBakery.Application.Service
                 return (false,
                     $"Rất tiếc, một số sản phẩm trong giỏ hàng đã hết hoặc không còn kinh doanh: " +
                     $"{string.Join(", ", unavailableProducts)}. " +
-                    "Vui lòng xóa các sản phẩm này khỏi giỏ hàng rồi thử lại nhé.", null);
+                    "Vui lòng xóa các sản phẩm này khỏi giỏ hàng rồi thử lại nhé.", null, null);
 
             if (insufficientStockProducts.Count > 0)
                 return (false,
                     $"Rất tiếc, số lượng trong kho không đủ cho: {string.Join(", ", insufficientStockProducts)}. " +
-                    "Vui lòng điều chỉnh số lượng trong giỏ hàng rồi thử lại nhé.", null);
+                    "Vui lòng điều chỉnh số lượng trong giỏ hàng rồi thử lại nhé.", null, null);
 
             if (orderItems.Count == 0)
-                return (false, "Không có sản phẩm hợp lệ nào để đặt hàng. Vui lòng kiểm tra lại giỏ hàng.", null);
+                return (false, "Không có sản phẩm hợp lệ nào để đặt hàng. Vui lòng kiểm tra lại giỏ hàng.", null, null);
 
             // ── Áp voucher (nếu có) ──────────────────────────────────
             // Tại thời điểm này mọi cart item đều hợp lệ (đủ hàng, chưa sold_out),
@@ -142,7 +146,7 @@ namespace BookingBakery.Application.Service
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return (false, ex.Message, null);
+                    return (false, ex.Message, null, null);
                 }
 
                 // Ghi đè UnitPrice/TotalPrice từng dòng theo giá đã áp voucher
@@ -184,6 +188,8 @@ namespace BookingBakery.Application.Service
                 Phone = phone,
                 Note = request.Note,
                 PaymentMethod = paymentMethod,
+                IsPaid = false,
+                PaymentStatus = paymentMethod == "Chuyển khoản" ? "Chờ thanh toán" : "Chưa thanh toán",
                 CreatedAt = now,
                 UpdatedAt = now,
                 StatusHistory = new List<OrderStatusHistory>
@@ -207,9 +213,38 @@ namespace BookingBakery.Application.Service
             if (!string.IsNullOrWhiteSpace(appliedVoucherCode))
                 await _voucherService.ConfirmVoucherUsageAsync(userId, appliedVoucherCode);
 
+            string? paymentUrl = null;
+            if (paymentMethod == "Chuyển khoản")
+            {
+                var tmnCode = _configuration["VnPay:TmnCode"] ?? string.Empty;
+                var hashSecret = _configuration["VnPay:HashSecret"] ?? string.Empty;
+                var baseUrl = _configuration["VnPay:BaseUrl"] ?? string.Empty;
+                var returnUrl = !string.IsNullOrWhiteSpace(request.ReturnUrl) 
+                    ? request.ReturnUrl 
+                    : (_configuration["VnPay:ReturnUrl"] ?? string.Empty);
+
+                var vnpay = new BookingBakery.Application.Common.VnPayLibrary();
+                vnpay.AddRequestData("vnp_Version", "2.1.0");
+                vnpay.AddRequestData("vnp_Command", "pay");
+                vnpay.AddRequestData("vnp_TmnCode", tmnCode);
+                vnpay.AddRequestData("vnp_Amount", ((long)(totalPrice * 100)).ToString());
+                vnpay.AddRequestData("vnp_CreateDate", now.AddHours(7).ToString("yyyyMMddHHmmss")); // VNPay expects GMT+7
+                vnpay.AddRequestData("vnp_CurrCode", "VND");
+                vnpay.AddRequestData("vnp_IpAddr", "127.0.0.1");
+                vnpay.AddRequestData("vnp_Locale", "vn");
+                vnpay.AddRequestData("vnp_OrderInfo", $"Thanh toan don hang {orderId}");
+                vnpay.AddRequestData("vnp_OrderType", "other");
+                vnpay.AddRequestData("vnp_ReturnUrl", returnUrl);
+                vnpay.AddRequestData("vnp_TxnRef", orderId.ToString());
+                vnpay.AddRequestData("vnp_ExpireDate", now.AddHours(7).AddMinutes(15).ToString("yyyyMMddHHmmss"));
+
+                paymentUrl = vnpay.CreateRequestUrl(baseUrl, hashSecret);
+            }
+
             return (true,
                 "Đặt hàng thành công! Đơn hàng của bạn đang chờ nhân viên xác nhận.",
-                await MapToResponseAsync(order));
+                await MapToResponseAsync(order),
+                paymentUrl);
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -549,6 +584,8 @@ namespace BookingBakery.Application.Service
                 Note = o.Note,
                 CancelReason = o.CancelReason,
                 PaymentMethod = o.PaymentMethod,
+                IsPaid = o.IsPaid,
+                PaymentStatus = o.PaymentStatus,
                 DeliveredAt = o.DeliveredAt,
                 CreatedAt = o.CreatedAt,
                 UpdatedAt = o.UpdatedAt,
@@ -584,6 +621,8 @@ namespace BookingBakery.Application.Service
                 Note = o.Note,
                 CancelReason = o.CancelReason,
                 PaymentMethod = o.PaymentMethod,
+                IsPaid = o.IsPaid,
+                PaymentStatus = o.PaymentStatus,
                 DeliveredAt = o.DeliveredAt,
                 CreatedAt = o.CreatedAt,
                 UpdatedAt = o.UpdatedAt,
@@ -595,6 +634,73 @@ namespace BookingBakery.Application.Service
                     Note = last.Note
                 }
             };
+        }
+
+        public async Task<(string RspCode, string Message)> ProcessVnPayIpnAsync(Dictionary<string, string> vnpayParams, string secureHash)
+        {
+            var hashSecret = _configuration["VnPay:HashSecret"] ?? string.Empty;
+            var vnpay = new BookingBakery.Application.Common.VnPayLibrary();
+
+            foreach (var kv in vnpayParams)
+            {
+                vnpay.AddResponseData(kv.Key, kv.Value);
+            }
+
+            bool isValidSignature = vnpay.ValidateSignature(secureHash, hashSecret);
+            if (!isValidSignature)
+            {
+                return ("97", "Invalid signature");
+            }
+
+            if (!vnpayParams.TryGetValue("vnp_TxnRef", out var orderIdStr) || !int.TryParse(orderIdStr, out var orderId))
+            {
+                return ("01", "Order not found");
+            }
+
+            var order = await _orderRepo.GetByOrderIdAsync(orderId);
+            if (order == null)
+            {
+                return ("01", "Order not found");
+            }
+
+            if (!vnpayParams.TryGetValue("vnp_Amount", out var amountStr) || !long.TryParse(amountStr, out var vnpAmountLong))
+            {
+                return ("04", "Invalid amount");
+            }
+
+            decimal vnpAmount = (decimal)vnpAmountLong / 100;
+            if (order.TotalPrice != vnpAmount)
+            {
+                return ("04", "Invalid amount");
+            }
+
+            if (order.PaymentStatus == "Đã thanh toán")
+            {
+                return ("02", "Order already confirmed");
+            }
+
+            vnpayParams.TryGetValue("vnp_ResponseCode", out var responseCode);
+            vnpayParams.TryGetValue("vnp_TransactionStatus", out var transactionStatus);
+
+            var now = DateTime.UtcNow;
+            if (responseCode == "00" && transactionStatus == "00")
+            {
+                order.IsPaid = true;
+                order.PaymentStatus = "Đã thanh toán";
+                
+                vnpayParams.TryGetValue("vnp_TransactionNo", out var transNo);
+                AppendStatusHistory(order, order.Status, order.UserId, "VNPay System", $"Thanh toan online thanh cong qua VNPAY. Ma giao dich VNPAY: {transNo}");
+            }
+            else
+            {
+                order.PaymentStatus = "Thanh toán thất bại";
+                AppendStatusHistory(order, order.Status, order.UserId, "VNPay System", $"Thanh toan online that bai. Ma loi: {responseCode}");
+            }
+
+            order.UpdatedAt = now;
+            await _orderRepo.UpdateAsync(order);
+
+            return ("00", "Confirm Success");
         }
     }
 }

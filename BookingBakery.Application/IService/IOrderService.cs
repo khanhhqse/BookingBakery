@@ -1,11 +1,13 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 
 namespace BookingBakery.Application.IService
 {
     public interface IOrderService
     {
-        Task<(bool Success, string Message, OrderResponse? Order)> PlaceOrderAsync(
+        Task<(bool Success, string Message, OrderResponse? Order, string? PaymentUrl)> PlaceOrderAsync(
             int userId, PlaceOrderRequest request);
+
+        Task<(string RspCode, string Message)> ProcessVnPayIpnAsync(Dictionary<string, string> vnpayParams, string secureHash);
 
         Task<(bool Success, string Message, List<OrderSummaryResponse>? Orders)> GetMyOrdersAsync(
             int userId);

@@ -1,4 +1,4 @@
-﻿using BookingBakery.Application.DTO;
+using BookingBakery.Application.DTO;
 using BookingBakery.Application.IService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,10 +38,10 @@ namespace BookingBakery.Controllers
             if (userId == null)
                 return Unauthorized(new { message = "Không xác định được thông tin người dùng. Vui lòng đăng nhập lại." });
 
-            var (success, message, order) = await _orderService.PlaceOrderAsync(userId.Value, request);
+            var (success, message, order, paymentUrl) = await _orderService.PlaceOrderAsync(userId.Value, request);
 
             return success
-                ? Ok(new { message, data = order })
+                ? Ok(new { message, data = order, paymentUrl })
                 : BadRequest(new { message });
         }
 
