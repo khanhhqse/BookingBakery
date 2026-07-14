@@ -42,6 +42,19 @@ namespace BookingBakery.Application.DTO
         public decimal QuantityRequired { get; set; }
     }
 
+    public class CreateProductIngredientByIdDto
+    {
+        [Required(ErrorMessage = "Mã sản phẩm là bắt buộc.")]
+        public int ProductId { get; set; }
+
+        [Required(ErrorMessage = "Mã nguyên liệu là bắt buộc.")]
+        public int IngredientId { get; set; }
+
+        [Required(ErrorMessage = "Số lượng cần thiết là bắt buộc.")]
+        [Range(0.001, double.MaxValue, ErrorMessage = "Số lượng yêu cầu phải lớn hơn 0.")]
+        public decimal QuantityRequired { get; set; }
+    }
+
     public class UpdateProductIngredientDto
     {
         [Required(ErrorMessage = "Số lượng cần thiết là bắt buộc.")]

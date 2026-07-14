@@ -163,6 +163,148 @@ namespace BookingBakery.Application.Service
             return true;
         }
 
+        public async Task<ProductIngredientDto> AddProductIngredientByIdAsync(CreateProductIngredientByIdDto dto)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == dto.ProductId);
+            if (product == null)
+                throw new InvalidOperationException($"Sản phẩm với ID '{dto.ProductId}' không tồn tại.");
+
+            var ingredient = await _ingredientRepository.FindOneAsync(i => i.IngredientId == dto.IngredientId);
+            if (ingredient == null)
+                throw new InvalidOperationException($"Nguyên liệu với ID '{dto.IngredientId}' không tồn tại.");
+
+            // Kiểm tra xem đã tồn tại mối quan hệ chưa
+            var existing = await _productIngredientRepository.FindOneAsync(pi => pi.ProductId == product.ProductId && pi.IngredientId == ingredient.IngredientId);
+            if (existing != null)
+                throw new InvalidOperationException($"Nguyên liệu '{ingredient.Name}' đã tồn tại trong sản phẩm '{product.Name}'. Vui lòng dùng tính năng cập nhật.");
+
+            if (dto.QuantityRequired <= 0)
+                throw new InvalidOperationException("Số lượng yêu cầu phải lớn hơn 0.");
+
+            var productIngredient = new ProductIngredient
+            {
+                ProductId = product.ProductId,
+                IngredientId = ingredient.IngredientId,
+                QuantityRequired = dto.QuantityRequired
+            };
+
+            await _productIngredientRepository.CreateAsync(productIngredient);
+            
+            var newCostPrice = await RecalculateProductCostPriceAsync(product);
+
+            return new ProductIngredientDto
+            {
+                ProductId = product.ProductId,
+                ProductName = product.Name,
+                IngredientId = ingredient.IngredientId,
+                IngredientName = ingredient.Name,
+                QuantityRequired = productIngredient.QuantityRequired,
+                Unit = ingredient.Unit,
+                CurrentStock = ingredient.CurrentStock,
+                ProductCostPrice = newCostPrice
+            };
+        }
+
+        public async Task<ProductIngredientDto?> UpdateProductIngredientByIdAsync(int productId, int ingredientId, UpdateProductIngredientDto dto)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == productId);
+            if (product == null)
+                throw new InvalidOperationException($"Sản phẩm với ID '{productId}' không tồn tại.");
+
+            var ingredient = await _ingredientRepository.FindOneAsync(i => i.IngredientId == ingredientId);
+            if (ingredient == null)
+                throw new InvalidOperationException($"Nguyên liệu với ID '{ingredientId}' không tồn tại.");
+
+            var productIngredient = await _productIngredientRepository.FindOneAsync(pi => pi.ProductId == product.ProductId && pi.IngredientId == ingredient.IngredientId);
+            if (productIngredient == null)
+                return null;
+
+            if (dto.QuantityRequired <= 0)
+                throw new InvalidOperationException("Số lượng yêu cầu phải lớn hơn 0.");
+
+            productIngredient.QuantityRequired = dto.QuantityRequired;
+
+            await _productIngredientRepository.UpdateAsync(
+                pi => pi.ProductId == product.ProductId && pi.IngredientId == ingredient.IngredientId,
+                productIngredient);
+            
+            var newCostPrice = await RecalculateProductCostPriceAsync(product);
+
+            return new ProductIngredientDto
+            {
+                ProductId = product.ProductId,
+                ProductName = product.Name,
+                IngredientId = ingredient.IngredientId,
+                IngredientName = ingredient.Name,
+                QuantityRequired = productIngredient.QuantityRequired,
+                Unit = ingredient.Unit,
+                CurrentStock = ingredient.CurrentStock,
+                ProductCostPrice = newCostPrice
+            };
+        }
+
+        public async Task<ProductRecipeDto> GetIngredientsByProductIdAsync(int productId)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == productId);
+            if (product == null)
+                throw new InvalidOperationException($"Sản phẩm với ID '{productId}' không tồn tại.");
+
+            var list = await _productIngredientRepository.FindManyAsync(pi => pi.ProductId == product.ProductId);
+            var ingredients = await _ingredientRepository.GetAllAsync();
+            var ingredientMap = ingredients.ToDictionary(i => i.IngredientId, i => i);
+
+            decimal totalCostPrice = 0;
+            var ingredientList = new List<RecipeIngredientDto>();
+
+            foreach (var pi in list)
+            {
+                ingredientMap.TryGetValue(pi.IngredientId, out var ing);
+                decimal costPerUnit = ing?.CostPerUnit ?? 0;
+                totalCostPrice += pi.QuantityRequired * costPerUnit;
+
+                ingredientList.Add(new RecipeIngredientDto
+                {
+                    IngredientName = ing?.Name ?? "Không xác định",
+                    QuantityRequired = pi.QuantityRequired,
+                    Unit = ing?.Unit ?? string.Empty,
+                    CurrentStock = ing?.CurrentStock ?? 0
+                });
+            }
+
+            // Đồng bộ lại giá vốn của sản phẩm trong MongoDB nếu có sự khác biệt (ví dụ dữ liệu cũ chưa tính)
+            if (product.CostPrice != totalCostPrice)
+            {
+                product.CostPrice = totalCostPrice;
+                product.UpdatedAt = DateTime.UtcNow;
+                await _productRepository.UpdateAsync(p => p.ProductId == product.ProductId, product);
+            }
+
+            return new ProductRecipeDto
+            {
+                ProductName = product.Name,
+                ProductCostPrice = totalCostPrice,
+                Ingredients = ingredientList
+            };
+        }
+
+        public async Task<bool> DeleteProductIngredientByIdAsync(int productId, int ingredientId)
+        {
+            var product = await _productRepository.FindOneAsync(p => p.ProductId == productId);
+            if (product == null) return false;
+
+            var ingredient = await _ingredientRepository.FindOneAsync(i => i.IngredientId == ingredientId);
+            if (ingredient == null) return false;
+
+            var existing = await _productIngredientRepository.FindOneAsync(pi => pi.ProductId == product.ProductId && pi.IngredientId == ingredient.IngredientId);
+            if (existing == null) return false;
+
+            await _productIngredientRepository.DeleteAsync(pi => pi.ProductId == product.ProductId && pi.IngredientId == ingredient.IngredientId);
+            
+            await RecalculateProductCostPriceAsync(product);
+            
+            return true;
+        }
+
         //Helper: Tính toán lại giá vốn của sản phẩm
         private async Task<decimal> RecalculateProductCostPriceAsync(Product product)
         {
