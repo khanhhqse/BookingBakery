@@ -56,6 +56,7 @@ namespace BookingBakery.Application.Service
         public async Task<VoucherDto> CreateAsync(CreateVoucherRequest request)
         {
             ValidateScope(request.ApplyScope, request.ProductIds);
+            ValidateDiscountValue(request.DiscountType, request.DiscountValue);
 
             var existed = await _voucherRepository.GetByCodeAsync(request.Code);
             if (existed != null)
@@ -71,6 +72,7 @@ namespace BookingBakery.Application.Service
                 VoucherId = nextId,
                 Code = request.Code,
                 Description = request.Description,
+                DiscountType = request.DiscountType.ToString(),
                 DiscountValue = request.DiscountValue,
                 MinOrderValue = request.MinOrderValue,
                 MaxDiscountAmount = request.MaxDiscountAmount,
@@ -93,11 +95,13 @@ namespace BookingBakery.Application.Service
         public async Task<VoucherDto> UpdateAsync(int voucherId, UpdateVoucherRequest request)
         {
             ValidateScope(request.ApplyScope, request.ProductIds);
+            ValidateDiscountValue(request.DiscountType, request.DiscountValue);
 
             var voucher = await _voucherRepository.GetByIdAsync(voucherId)
                 ?? throw new InvalidOperationException($"Không tìm thấy voucher #{voucherId}.");
 
             voucher.Description = request.Description;
+            voucher.DiscountType = request.DiscountType.ToString();
             voucher.DiscountValue = request.DiscountValue;
             voucher.MinOrderValue = request.MinOrderValue;
             voucher.MaxDiscountAmount = request.MaxDiscountAmount;
@@ -149,8 +153,6 @@ namespace BookingBakery.Application.Service
 
         public async Task<List<VoucherDto>> GetMyUsedVouchersAsync(int userId)
         {
-            // "Đã dùng" luôn phản ánh đúng qua bảng UserVoucher, vì bản ghi UserVoucher
-            // chỉ được tạo/đánh dấu khi ConfirmVoucherUsageAsync chạy (sau khi đặt hàng thành công).
             return await GetVouchersByUserVoucherStatusAsync(userId, "used");
         }
 
@@ -161,7 +163,6 @@ namespace BookingBakery.Application.Service
                 .Where(v => v.Status == "active" && v.StartDate <= today && v.EndDate >= today)
                 .ToList();
 
-            // Danh sách voucherId mà user này đã dùng rồi (để loại trừ)
             var usedUserVouchers = await _userVoucherRepository.GetByUserIdAsync(userId, "used");
             var usedVoucherIds = usedUserVouchers.Select(uv => uv.VoucherId).ToHashSet();
 
@@ -170,19 +171,16 @@ namespace BookingBakery.Application.Service
             foreach (var voucher in allVouchers)
             {
                 if (usedVoucherIds.Contains(voucher.VoucherId))
-                    continue; // user đã dùng voucher này rồi -> không hiện ở "chưa dùng"
+                    continue;
 
                 if (voucher.RequiresAssignment)
                 {
-                    // Voucher loại "được gán riêng": chỉ hiện nếu user thực sự có UserVoucher status = unused
                     var userVoucher = await _userVoucherRepository.GetByVoucherAndUserAsync(voucher.VoucherId, userId);
                     if (userVoucher != null && userVoucher.Status == "unused")
                         result.Add(await MapToDtoAsync(voucher));
                 }
                 else
                 {
-                    // Voucher tự do (không cần gán): mọi Customer đều thấy nếu chưa dùng,
-                    // kể cả khi chưa từng có bản ghi UserVoucher nào.
                     result.Add(await MapToDtoAsync(voucher));
                 }
             }
@@ -281,10 +279,20 @@ namespace BookingBakery.Application.Service
                 throw new InvalidOperationException(
                     $"Rất tiếc, đơn hàng cần tối thiểu {voucher.MinOrderValue:N0}đ để áp dụng voucher này.");
 
-            var rawDiscount = eligibleAmount * (voucher.DiscountValue / 100m);
+            // ── Tính discount theo loại: percentage hoặc fixed_amount ──
+            var isFixedAmount = string.Equals(voucher.DiscountType, "FixedAmount", StringComparison.OrdinalIgnoreCase);
+
+            var rawDiscount = isFixedAmount
+                ? voucher.DiscountValue
+                : eligibleAmount * (voucher.DiscountValue / 100m);
+
             var actualDiscount = voucher.MaxDiscountAmount > 0
                 ? Math.Min(rawDiscount, voucher.MaxDiscountAmount)
                 : rawDiscount;
+
+            // Không để discount vượt quá tổng tiền các sản phẩm được áp voucher
+            // (quan trọng nhất với fixed_amount, vì DiscountValue là số cố định, không tự co theo đơn nhỏ)
+            actualDiscount = Math.Min(actualDiscount, eligibleAmount);
 
             if (eligibleAmount > 0 && actualDiscount > 0)
             {
@@ -344,6 +352,15 @@ namespace BookingBakery.Application.Service
                 throw new InvalidOperationException("Vui lòng chọn ít nhất 1 sản phẩm khi ApplyScope = SpecificProducts.");
         }
 
+        private void ValidateDiscountValue(VoucherDiscountType discountType, decimal discountValue)
+        {
+            if (discountValue <= 0)
+                throw new InvalidOperationException("Giá trị giảm giá (DiscountValue) phải lớn hơn 0.");
+
+            if (discountType == VoucherDiscountType.Percentage && discountValue > 100)
+                throw new InvalidOperationException("Với DiscountType = Percentage, DiscountValue không được vượt quá 100.");
+        }
+
         private async Task AddVoucherProductsInternalAsync(int voucherId, List<int> productIds)
         {
             foreach (var productId in productIds.Distinct())
@@ -374,7 +391,7 @@ namespace BookingBakery.Application.Service
                 VoucherId = voucher.VoucherId,
                 Code = voucher.Code,
                 Description = voucher.Description,
-                DiscountType = voucher.DiscountType,
+                DiscountType = Enum.Parse<VoucherDiscountType>(voucher.DiscountType, ignoreCase: true),
                 DiscountValue = voucher.DiscountValue,
                 MinOrderValue = voucher.MinOrderValue,
                 MaxDiscountAmount = voucher.MaxDiscountAmount,

@@ -19,12 +19,12 @@ namespace BookingBakery.Domain.Models
         [BsonElement("description")]
         public string? Description { get; set; }
 
-        // Hiện tại chỉ hỗ trợ percentage, để field sẵn cho mở rộng sau (fixed_amount...)
+        // "percentage" = giảm theo %, "fixed_amount" = giảm số tiền cố định (vd 500000 = giảm 500k)
         [BsonElement("discount_type")]
         public string DiscountType { get; set; } = "percentage";
 
         [BsonElement("discount_value")]
-        public decimal DiscountValue { get; set; } // % giảm, vd 10 = 10%
+        public decimal DiscountValue { get; set; } // percentage: % giảm (vd 10 = 10%) | fixed_amount: số tiền giảm (vd 500000)
 
         [BsonElement("min_order_value")]
         public decimal MinOrderValue { get; set; }
@@ -41,17 +41,12 @@ namespace BookingBakery.Domain.Models
         [BsonElement("status")]
         public string Status { get; set; } = "active"; // active/inactive
 
-        // true = được cộng dồn thêm vào giá đã sale từ promotion
-        // false = bỏ qua promotion, tính % giảm trên giá gốc
         [BsonElement("can_combine_with_promotion")]
         public bool CanCombineWithPromotion { get; set; }
 
-        // "AllProducts" | "SpecificProducts"
         [BsonElement("apply_scope")]
         public string ApplyScope { get; set; } = "AllProducts";
 
-        // true = voucher chỉ dùng được khi user đã được gán trước (vd trúng từ minigame) -> check bảng UserVoucher
-        // false = voucher công khai, ai nhập đúng code cũng dùng được (nhưng mỗi user chỉ 1 lần)
         [BsonElement("requires_assignment")]
         public bool RequiresAssignment { get; set; } = false;
 

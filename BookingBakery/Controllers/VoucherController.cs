@@ -55,8 +55,8 @@ namespace BookingBakery.Presentation.Controllers
 
         [HttpPost]
         [Authorize(Roles = "1")]
-        [EndpointSummary("Thêm mới voucher")]
-        [EndpointDescription("Admin tạo voucher mới.ApplyScope = 0 => Áp dụng cho tất cả sp, ApplyScope = 1 => áp dụng cho 1 số sp => bắt buộc phải truyền ProductIds (danh sách sản phẩm được áp dụng). Mã Code phải là duy nhất trong hệ thống.")]
+        [EndpointSummary("Admin thêm mới voucher")]
+        [EndpointDescription("Admin tạo voucher mới. Discount type = 0 => giảm theo %, 1 => giá cố định. ApplyScope = 0 => Áp dụng cho tất cả sp, ApplyScope = 1 => áp dụng cho 1 số sp => bắt buộc phải truyền ProductIds (danh sách sản phẩm được áp dụng). Mã Code phải là duy nhất trong hệ thống.")]
         public async Task<IActionResult> Create([FromBody] CreateVoucherRequest request)
             => Ok(await _voucherService.CreateAsync(request));
 

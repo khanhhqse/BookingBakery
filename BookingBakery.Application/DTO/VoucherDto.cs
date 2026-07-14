@@ -2,13 +2,20 @@
 
 namespace BookingBakery.Application.DTO
 {
+    // ── Enum cho Swagger dropdown ───────────────────────────
+    public enum VoucherDiscountType
+    {
+        Percentage = 0,   // giảm theo %, DiscountValue là số % (vd 10 = 10%)
+        FixedAmount = 1   // giảm số tiền cố định, DiscountValue là số VNĐ (vd 500000 = giảm 500k)
+    }
+
     // ── Output ─────────────────────────────────────────────
     public class VoucherDto
     {
         public int VoucherId { get; set; }
         public string Code { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public string DiscountType { get; set; } = "percentage";
+        public VoucherDiscountType DiscountType { get; set; } = VoucherDiscountType.Percentage;
         public decimal DiscountValue { get; set; }
         public decimal MinOrderValue { get; set; }
         public decimal MaxDiscountAmount { get; set; }
@@ -31,7 +38,11 @@ namespace BookingBakery.Application.DTO
         [DefaultValue("Giảm giá bánh mì")]
         public string? Description { get; set; }
 
-        /// <summary>% giảm giá. VD: 10 nghĩa là giảm 10%</summary>
+        /// <summary>Percentage = giảm theo %. FixedAmount = giảm số tiền cố định</summary>
+        [DefaultValue(VoucherDiscountType.Percentage)]
+        public VoucherDiscountType DiscountType { get; set; } = VoucherDiscountType.Percentage;
+
+        /// <summary>Nếu DiscountType = Percentage: nhập % (vd 10 = giảm 10%). Nếu DiscountType = FixedAmount: nhập số tiền VNĐ (vd 500000 = giảm 500k)</summary>
         [DefaultValue(10)]
         public decimal DiscountValue { get; set; }
 
@@ -39,7 +50,7 @@ namespace BookingBakery.Application.DTO
         [DefaultValue(10000)]
         public decimal MinOrderValue { get; set; }
 
-        /// <summary>Số tiền giảm tối đa. 0 = không giới hạn trần</summary>
+        /// <summary>Số tiền giảm tối đa. 0 = không giới hạn trần. Chỉ có ý nghĩa với DiscountType = Percentage (FixedAmount thì trần chính là DiscountValue)</summary>
         [DefaultValue(30000)]
         public decimal MaxDiscountAmount { get; set; }
 
@@ -49,7 +60,7 @@ namespace BookingBakery.Application.DTO
         /// <summary>Ngày hết hiệu lực</summary>
         public DateOnly EndDate { get; set; }
 
-        /// <summary>true = được cộng dồn thêm vào giá đã giảm từ promotion. false = bỏ qua promotion, tính % trên giá gốc</summary>
+        /// <summary>true = được cộng dồn thêm vào giá đã giảm từ promotion. false = bỏ qua promotion, tính giảm trên giá gốc</summary>
         [DefaultValue(true)]
         public bool CanCombineWithPromotion { get; set; }
 
@@ -66,7 +77,14 @@ namespace BookingBakery.Application.DTO
     public class UpdateVoucherRequest
     {
         public string? Description { get; set; }
+
+        /// <summary>Percentage = giảm theo %. FixedAmount = giảm số tiền cố định</summary>
+        [DefaultValue(VoucherDiscountType.Percentage)]
+        public VoucherDiscountType DiscountType { get; set; } = VoucherDiscountType.Percentage;
+
+        /// <summary>Nếu DiscountType = Percentage: nhập % (vd 10 = giảm 10%). Nếu DiscountType = FixedAmount: nhập số tiền VNĐ (vd 500000 = giảm 500k)</summary>
         public decimal DiscountValue { get; set; }
+
         public decimal MinOrderValue { get; set; }
         public decimal MaxDiscountAmount { get; set; }
         public DateOnly StartDate { get; set; }
