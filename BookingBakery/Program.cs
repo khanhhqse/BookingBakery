@@ -58,6 +58,11 @@ namespace BookingBakery
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<IPromotionPriceHelper, PromotionPriceHelper>();
 
+            builder.Services.AddScoped<IVoucherRepository, VoucherRepository>();
+            builder.Services.AddScoped<IVoucherProductRepository, VoucherProductRepository>();
+            builder.Services.AddScoped<IUserVoucherRepository, UserVoucherRepository>();
+            builder.Services.AddScoped<IVoucherService, VoucherService>();
+
 
 
             // ─── Cloudinary ──────────────────────────────────────────────

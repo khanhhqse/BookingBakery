@@ -22,7 +22,7 @@ namespace BookingBakery.Domain.Models
         [BsonElement("quantity")]
         public int Quantity { get; set; }
 
-        /// <summary>Giá đã áp promotion (nếu có) của size đã chọn.</summary>
+        /// <summary>Giá đã áp promotion + voucher (nếu có) của size đã chọn.</summary>
         [BsonElement("unit_price")]
         [BsonRepresentation(BsonType.Decimal128)]
         public decimal UnitPrice { get; set; }
@@ -58,6 +58,15 @@ namespace BookingBakery.Domain.Models
         [BsonElement("total_price")]
         [BsonRepresentation(BsonType.Decimal128)]
         public decimal TotalPrice { get; set; }
+
+        /// <summary>Mã voucher đã áp dụng cho đơn này (snapshot), null nếu không dùng.</summary>
+        [BsonElement("voucher_code")]
+        public string? VoucherCode { get; set; }
+
+        /// <summary>Số tiền đã được giảm nhờ voucher (snapshot), 0 nếu không dùng voucher.</summary>
+        [BsonElement("voucher_discount_amount")]
+        [BsonRepresentation(BsonType.Decimal128)]
+        public decimal VoucherDiscountAmount { get; set; }
 
         [BsonElement("shipping_address")]
         public string ShippingAddress { get; set; } = string.Empty;

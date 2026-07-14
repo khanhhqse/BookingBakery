@@ -36,6 +36,12 @@ namespace BookingBakery.Application.DTO
 
         [Required(ErrorMessage = "Vui lòng chọn phương thức thanh toán.")]
         public PaymentMethodOption PaymentMethod { get; set; }
+
+        /// <summary>
+        /// Tùy chọn. Để trống nếu không dùng voucher. Nếu truyền mã không hợp lệ
+        /// (hết hạn, đã dùng, không đạt điều kiện...) đơn hàng sẽ báo lỗi và KHÔNG được tạo.
+        /// </summary>
+        public string? VoucherCode { get; set; }
     }
 
     public class CancelOrderRequest
@@ -109,6 +115,10 @@ namespace BookingBakery.Application.DTO
         public int TotalQuantity { get; set; }
         public string Status { get; set; } = string.Empty;
         public decimal TotalPrice { get; set; }
+        /// <summary>Mã voucher đã áp dụng cho đơn này, null nếu không dùng voucher.</summary>
+        public string? VoucherCode { get; set; }
+        /// <summary>Số tiền đã được giảm nhờ voucher (0 nếu không dùng voucher).</summary>
+        public decimal VoucherDiscountAmount { get; set; }
         public string ShippingAddress { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string? Note { get; set; }
@@ -128,6 +138,10 @@ namespace BookingBakery.Application.DTO
         public List<OrderItemResponse> Items { get; set; } = new();
         public string Status { get; set; } = string.Empty;
         public decimal TotalPrice { get; set; }
+        /// <summary>Mã voucher đã áp dụng cho đơn này, null nếu không dùng voucher.</summary>
+        public string? VoucherCode { get; set; }
+        /// <summary>Số tiền đã được giảm nhờ voucher (0 nếu không dùng voucher).</summary>
+        public decimal VoucherDiscountAmount { get; set; }
         public string ShippingAddress { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string? Note { get; set; }
